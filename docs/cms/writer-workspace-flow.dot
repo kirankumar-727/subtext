@@ -1,0 +1,1 @@
+digraph WriterFlow { graph [rankdir="TB",bgcolor="#f4f0e7",pad="0.3"]; node [shape="box",style="rounded,filled",fillcolor="#fbf8f1",color="#9d9585",fontname="Arial"]; edge [color="#7b7569"]; Admin -> Stories -> "New Story" -> Write -> Autosave -> Preview -> Publish -> "Publishing Engine"; }

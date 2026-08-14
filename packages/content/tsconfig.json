@@ -1,0 +1,5 @@
+{
+  "extends": "@subtext/typescript-config/react-library.json",
+  "compilerOptions": { "types": ["react", "vitest/globals"] },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}

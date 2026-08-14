@@ -1,0 +1,33 @@
+{
+  "name": "@subtext/supabase",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./admin": "./src/admin.ts",
+    "./browser": "./src/browser.ts",
+    "./proxy": "./src/proxy.ts",
+    "./public-server": "./src/public-server.ts",
+    "./server": "./src/server.ts",
+    "./database.types": "./src/database.types.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@supabase/ssr": "0.12.4",
+    "@supabase/supabase-js": "2.112.2",
+    "server-only": "0.0.1"
+  },
+  "devDependencies": {
+    "@subtext/eslint-config": "*",
+    "@subtext/typescript-config": "*",
+    "@types/node": "26.2.0",
+    "next": "16.3.0",
+    "typescript": "5.9.3"
+  },
+  "peerDependencies": {
+    "next": ">=16.0.0"
+  }
+}

@@ -1,0 +1,1 @@
+digraph G{rankdir=LR;node[shape=ellipse,style=filled,fillcolor="#fbf8f1"];queued->processing[label="claim"];failed->processing[label="retry"];processing->committed;committed->verifying;verifying->succeeded;processing->failed;committed->failed;verifying->failed;failed->dead_letter;processing->dead_letter;}

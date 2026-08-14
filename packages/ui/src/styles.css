@@ -1,0 +1,78 @@
+:root {
+  --st-color-ink: #171713;
+  --st-color-paper: #f4f0e7;
+  --st-color-paper-raised: #fbf8f1;
+  --st-color-muted: #67645d;
+  --st-color-rule: #cbc5b7;
+  --st-color-accent: #9f3f2f;
+  --st-color-accent-strong: #793023;
+  --st-font-editorial: Georgia, "Times New Roman", serif;
+  --st-font-interface:
+    Inter, ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --st-font-mono: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  --st-page-gutter: clamp(1.25rem, 4vw, 4.5rem);
+  --st-content-wide: 78rem;
+  --st-content-reading: 44rem;
+  --st-radius-small: 0.25rem;
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  background: var(--st-color-paper);
+  color: var(--st-color-ink);
+  font-family: var(--st-font-interface);
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+}
+
+button,
+input,
+textarea,
+select {
+  font: inherit;
+}
+
+a {
+  color: inherit;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--st-color-accent) 24%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--st-color-accent);
+  outline-offset: 3px;
+}
+
+.st-brand-mark {
+  align-items: baseline;
+  display: inline-flex;
+  gap: 0.42em;
+  text-decoration: none;
+}
+
+.st-brand-mark__word {
+  font-family: var(--st-font-editorial);
+  font-size: 1.35rem;
+  font-weight: 700;
+  letter-spacing: -0.035em;
+}
+
+.st-brand-mark__suffix {
+  color: var(--st-color-muted);
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.17em;
+  text-transform: uppercase;
+}

@@ -1,0 +1,1 @@
+digraph G{rankdir=LR;node[shape=box,style="rounded,filled",fillcolor="#fbf8f1"];CMS->"Immutable Revision"->"Publication Job"->"Publishing Engine"->"Safe Public Views"->"Public Next.js"->"Targeted Cache/CDN";}

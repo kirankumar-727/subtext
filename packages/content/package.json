@@ -1,0 +1,43 @@
+{
+  "name": "@subtext/content",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "sideEffects": [
+    "**/*.css"
+  ],
+  "exports": {
+    ".": "./src/index.ts",
+    "./renderer": "./src/markdown-renderer.tsx",
+    "./styles.css": "./src/styles.css"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "react-markdown": "10.1.0",
+    "rehype-sanitize": "6.0.0",
+    "remark-directive": "4.0.0",
+    "remark-gfm": "4.0.1",
+    "unist-util-visit": "5.1.0",
+    "unified": "11.0.5",
+    "remark-parse": "11.0.0",
+    "remark-rehype": "11.1.2",
+    "rehype-stringify": "10.0.1"
+  },
+  "devDependencies": {
+    "@subtext/eslint-config": "*",
+    "@subtext/typescript-config": "*",
+    "@types/react": "19.2.18",
+    "react": "19.2.8",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10",
+    "react-dom": "19.2.8",
+    "@types/react-dom": "19.2.3"
+  },
+  "peerDependencies": {
+    "react": ">=19.0.0"
+  }
+}

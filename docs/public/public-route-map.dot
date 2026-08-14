@@ -1,0 +1,1 @@
+digraph G{rankdir=TB;node[shape=box,style="rounded,filled",fillcolor="#fbf8f1"];"/"->{"/history" "/business" "/psychology" "/society" "/search" "/about" "/sitemap.xml" "/feed.xml"};{"/history" "/business" "/psychology" "/society"}->"/{pillar}/{slug}";}

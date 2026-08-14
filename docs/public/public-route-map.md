@@ -1,0 +1,19 @@
+# Public Route Map
+
+![public-route-map](./public-route-map.svg)
+
+```mermaid
+flowchart TD
+  Root[/] --> History[/history]
+  Root --> Business[/business]
+  Root --> Psychology[/psychology]
+  Root --> Society[/society]
+  History --> Article[/{pillar}/{slug}]
+  Business --> Article
+  Psychology --> Article
+  Society --> Article
+  Root --> Search[/search]
+  Root --> About[/about]
+  Root --> Sitemap[/sitemap.xml]
+  Root --> RSS[/feed.xml]
+```

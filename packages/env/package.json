@@ -1,0 +1,24 @@
+{
+  "name": "@subtext/env",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    "./public": "./src/public.ts",
+    "./server": "./src/server.ts"
+  },
+  "scripts": {
+    "lint": "eslint . --max-warnings=0",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "zod": "4.4.3"
+  },
+  "devDependencies": {
+    "@subtext/eslint-config": "*",
+    "@subtext/typescript-config": "*",
+    "typescript": "5.9.3",
+    "vitest": "4.1.10"
+  }
+}

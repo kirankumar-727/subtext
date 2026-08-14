@@ -1,0 +1,43 @@
+digraph SubtextDependencies {
+  graph [rankdir="LR", bgcolor="#f4f0e7", pad="0.35", nodesep="0.35", ranksep="0.8", splines="ortho"];
+  node [shape="box", style="rounded,filled", fillcolor="#fbf8f1", color="#9d9585", fontname="Arial", fontsize="10"];
+  edge [color="#7b7569", fontname="Arial", fontsize="8", arrowsize="0.7"];
+
+  subgraph cluster_editorial { label="Editorial core"; color="#cbc5b7"; authors; pillars; categories; tags; articles; article_revisions; article_tags; }
+  subgraph cluster_research { label="Research provenance"; color="#cbc5b7"; sources; source_notes; citations; }
+  subgraph cluster_media { label="Media pipeline"; color="#cbc5b7"; media_originals [label="storage.media-originals", shape="cylinder"]; media_public [label="storage.media-public", shape="cylinder"]; media_assets; media_variants; article_media; }
+  subgraph cluster_publish { label="Publishing"; color="#cbc5b7"; publication_jobs; publication_events; redirects; slug_history; }
+  subgraph cluster_discovery { label="Discovery"; color="#cbc5b7"; search_projection; featured_collections; featured_collection_items; site_settings; audit_logs; }
+
+  authors -> articles;
+  pillars -> categories;
+  pillars -> articles;
+  categories -> articles;
+  tags -> article_tags;
+  articles -> article_tags;
+  articles -> article_revisions;
+  article_revisions -> articles [style="dashed", label="deferred pointers"];
+  sources -> source_notes;
+  sources -> citations;
+  article_revisions -> citations;
+  media_originals -> media_assets;
+  media_assets -> media_variants;
+  media_public -> media_variants;
+  article_revisions -> article_media;
+  media_assets -> article_media;
+  articles -> publication_jobs;
+  article_revisions -> publication_jobs;
+  publication_jobs -> publication_events;
+  publication_jobs -> articles [label="atomic promotion"];
+  articles -> redirects;
+  redirects -> slug_history;
+  authors -> search_projection;
+  pillars -> search_projection;
+  categories -> search_projection;
+  tags -> search_projection;
+  article_revisions -> search_projection;
+  articles -> search_projection;
+  featured_collections -> featured_collection_items;
+  articles -> featured_collection_items;
+  articles -> audit_logs [style="dotted", label="mutation trail"];
+}

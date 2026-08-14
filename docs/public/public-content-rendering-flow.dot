@@ -1,0 +1,1 @@
+digraph G{rankdir=TB;node[shape=box,style="rounded,filled",fillcolor="#fbf8f1"];"published_articles"->"Canonical Markdown";"published_citations"->"Canonical Markdown";"Canonical Markdown"->"@subtext/content"->"Sanitized semantic HTML"->"Article Page";"published_media"->"Article Page";"Article Page"->"Metadata + JSON-LD";}

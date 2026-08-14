@@ -1,0 +1,14 @@
+# Final Subtext Platform Architecture
+
+![Final platform architecture](./final-platform-architecture.svg)
+
+```mermaid
+flowchart TD
+  Founder --> Admin[Private Admin Application]
+  Admin --> CMS[Writer Workspace / CMS]
+  CMS --> Database[(Supabase PostgreSQL + Storage)]
+  Database --> Worker[Publishing Worker]
+  Worker --> Coordinator[Public Coordinator]
+  Coordinator --> Website[Public Editorial Website]
+  Website --> Reader[Reader]
+```

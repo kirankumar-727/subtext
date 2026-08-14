@@ -1,0 +1,10 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "framework": "nextjs",
+  "crons": [
+    {
+      "path": "/api/internal/publishing-tick",
+      "schedule": "0 3 * * *"
+    }
+  ]
+}

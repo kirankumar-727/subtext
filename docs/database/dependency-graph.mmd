@@ -1,0 +1,43 @@
+flowchart LR
+  %% GENERATED from the final schema and known workflow contracts.
+  subgraph EditorialCore[Editorial core]
+    authors --> articles
+    pillars --> categories
+    pillars --> articles
+    categories --> articles
+    articles --> article_revisions
+    article_revisions -. deferred pointers .-> articles
+    tags --> article_tags
+    articles --> article_tags
+  end
+  subgraph Research[Research provenance]
+    sources --> citations
+    sources --> source_notes
+    article_revisions --> citations
+  end
+  subgraph Media[Media pipeline]
+    storage_media_originals[(storage.media-originals)] --> media_assets
+    media_assets --> media_variants
+    storage_media_public[(storage.media-public)] --> media_variants
+    article_revisions --> article_media
+    media_assets --> article_media
+  end
+  subgraph Publishing[Publishing workflow]
+    article_revisions --> publication_jobs
+    articles --> publication_jobs
+    publication_jobs --> publication_events
+    publication_jobs -->|atomic pointer promotion| articles
+    articles --> redirects
+    articles --> slug_history
+    redirects --> slug_history
+  end
+  subgraph Discovery[Reader discovery]
+    authors --> search_projection
+    pillars --> search_projection
+    categories --> search_projection
+    tags --> search_projection
+    article_revisions --> search_projection
+    articles --> search_projection
+    articles --> featured_collection_items
+    featured_collections --> featured_collection_items
+  end

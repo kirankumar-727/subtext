@@ -1,0 +1,7 @@
+{
+  "extends": "@subtext/typescript-config/react-library.json",
+  "compilerOptions": {
+    "types": ["react"]
+  },
+  "include": ["src/**/*.ts", "src/**/*.tsx"]
+}

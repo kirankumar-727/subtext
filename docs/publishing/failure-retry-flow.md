@@ -1,0 +1,17 @@
+# Failure Retry Flow
+
+![failure-retry-flow](./failure-retry-flow.svg)
+
+```mermaid
+flowchart TD
+  Failure --> Classify{Retryable?}
+  Classify -->|No| Dead[dead_letter + event]
+  Classify -->|Yes| Attempts{Attempts remain?}
+  Attempts -->|No| Dead
+  Attempts -->|Yes| Backoff[Exponential available_at]
+  Backoff --> Failed[failed]
+  Failed --> Reclaim[Lease + reclaim]
+  Reclaim --> Resume{Committed already?}
+  Resume -->|No| Validate[Restart validation]
+  Resume -->|Yes| Verify[Resume verification]
+```
