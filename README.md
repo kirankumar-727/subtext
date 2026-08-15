@@ -107,7 +107,7 @@ See `docs/authentication/` for setup, session lifecycle, failure handling, RLS i
 
 See `docs/launch/README.md` for current blockers and sign-off requirements.
 
-##🎯 Milestone status
+## 🎯 Milestone status
 
 - [x] M1 — Monorepo and application foundation
 - [x] M2 — Database schema, RLS, Storage policy, generated types, and synchronized documentation
