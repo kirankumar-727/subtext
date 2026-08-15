@@ -62,7 +62,7 @@ Enable source files outside each Root Directory so workspace packages and the ro
 
 Vercel Hobby may be used only while the deployment is eligible under Vercel's non-commercial terms. Upgrade the existing projects before commercial use.
 
-##🎯 Database contract
+## 📃 Database contract
 
 All database changes are ordered SQL migrations in `supabase/migrations`. Dashboard schema edits are prohibited.
 
