@@ -15,7 +15,7 @@ const founderClaims: AuthClaims = {
   email: founderEmail,
   user_role: "admin",
   is_anonymous: false,
-  app_metadata: { provider: "google", providers: ["google"] },
+  app_metadata: { provider: "github", providers: ["github"] },
 };
 
 const founderUser: VerifiedUser = {
@@ -23,7 +23,7 @@ const founderUser: VerifiedUser = {
   email: founderEmail,
   email_confirmed_at: "2026-08-08T00:00:00.000Z",
   is_anonymous: false,
-  app_metadata: { provider: "google", providers: ["google"] },
+  app_metadata: { provider: "github", providers: ["github"] },
 };
 
 function authClient(options?: {
@@ -36,13 +36,18 @@ function authClient(options?: {
     auth: {
       async getClaims() {
         return {
-          data: { claims: options?.claims === undefined ? founderClaims : options.claims },
+          data: {
+            claims:
+              options?.claims === undefined ? founderClaims : options.claims,
+          },
           error: options?.claimsError ?? null,
         };
       },
       async getUser() {
         return {
-          data: { user: options?.user === undefined ? founderUser : options.user },
+          data: {
+            user: options?.user === undefined ? founderUser : options.user,
+          },
           error: options?.userError ?? null,
         };
       },
@@ -51,8 +56,10 @@ function authClient(options?: {
 }
 
 describe("evaluateAdminAuthorization", () => {
-  it("authorizes the verified founder Google identity", async () => {
-    await expect(evaluateAdminAuthorization(authClient(), founderEmail)).resolves.toEqual({
+  it("authorizes the verified founder GitHub identity", async () => {
+    await expect(
+      evaluateAdminAuthorization(authClient(), founderEmail),
+    ).resolves.toEqual({
       status: "authorized",
       admin: { userId },
     });
@@ -60,65 +67,112 @@ describe("evaluateAdminAuthorization", () => {
 
   it("rejects an unauthenticated visitor", async () => {
     await expect(
-      evaluateAdminAuthorization(authClient({ claims: null }), founderEmail),
-    ).resolves.toEqual({ status: "unauthenticated", reason: "missing_claims" });
+      evaluateAdminAuthorization(
+        authClient({ claims: null }),
+        founderEmail,
+      ),
+    ).resolves.toEqual({
+      status: "unauthenticated",
+      reason: "missing_claims",
+    });
   });
 
   it("rejects an expired or invalid server session", async () => {
     await expect(
       evaluateAdminAuthorization(
-        authClient({ user: null, userError: new Error("expired") }),
-        founderEmail,
-      ),
-    ).resolves.toEqual({ status: "unauthenticated", reason: "invalid_session" });
-  });
-
-  it("rejects a valid but unauthorized Google account", async () => {
-    const email = "someone-else@example.com";
-    await expect(
-      evaluateAdminAuthorization(
         authClient({
-          claims: { ...founderClaims, email, user_role: null },
-          user: { ...founderUser, email },
+          user: null,
+          userError: new Error("expired"),
         }),
         founderEmail,
       ),
-    ).resolves.toMatchObject({ status: "unauthorized" });
+    ).resolves.toEqual({
+      status: "unauthenticated",
+      reason: "invalid_session",
+    });
   });
 
-  it("rejects a non-Google identity even when the email matches", async () => {
+  it("rejects a valid but unauthorized GitHub account", async () => {
+    const email = "someone-else@example.com";
+
     await expect(
       evaluateAdminAuthorization(
         authClient({
           claims: {
             ...founderClaims,
-            app_metadata: { provider: "github", providers: ["github"] },
+            email,
+            user_role: null,
           },
           user: {
             ...founderUser,
-            app_metadata: { provider: "github", providers: ["github"] },
+            email,
           },
         }),
         founderEmail,
       ),
-    ).resolves.toEqual({ status: "unauthorized", reason: "wrong_provider" });
+    ).resolves.toMatchObject({
+      status: "unauthorized",
+    });
+  });
+
+  it("rejects a non-GitHub identity even when the email matches", async () => {
+    await expect(
+      evaluateAdminAuthorization(
+        authClient({
+          claims: {
+            ...founderClaims,
+            app_metadata: {
+              provider: "google",
+              providers: ["google"],
+            },
+          },
+          user: {
+            ...founderUser,
+            app_metadata: {
+              provider: "google",
+              providers: ["google"],
+            },
+          },
+        }),
+        founderEmail,
+      ),
+    ).resolves.toEqual({
+      status: "unauthorized",
+      reason: "wrong_provider",
+    });
   });
 
   it("rejects a matching identity without the server-issued admin claim", async () => {
     await expect(
       evaluateAdminAuthorization(
-        authClient({ claims: { ...founderClaims, user_role: null } }),
+        authClient({
+          claims: {
+            ...founderClaims,
+            user_role: null,
+          },
+        }),
         founderEmail,
       ),
-    ).resolves.toEqual({ status: "unauthorized", reason: "missing_admin_claim" });
+    ).resolves.toEqual({
+      status: "unauthorized",
+      reason: "missing_admin_claim",
+    });
   });
 
   it("rejects an unverified email", async () => {
     await expect(
       evaluateAdminAuthorization(
-        authClient({ user: { ...founderUser, email_confirmed_at: null } }),
+        authClient({
+          user: {
+            ...founderUser,
+            email_confirmed_at: null,
+          },
+        }),
         founderEmail,
       ),
-    ).resolves.toEqual({ status: "unauthorized", reason: "unverified_email" });
+    ).resolves.toEqual({
+      status: "unauthorized",
+      reason: "unverified_email",
+    });
   });
 });
