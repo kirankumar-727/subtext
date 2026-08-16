@@ -44,17 +44,29 @@ export type AdminAuthorization =
     }
   | {
       status: "unauthorized";
-      reason: "identity_mismatch" | "unverified_email" | "wrong_provider" | "missing_admin_claim";
+      reason:
+        | "identity_mismatch"
+        | "unverified_email"
+        | "wrong_provider"
+        | "missing_admin_claim";
     };
 
 export function normalizeEmail(value: unknown): string {
-  return typeof value === "string" ? value.trim().toLocaleLowerCase("en-US") : "";
+  return typeof value === "string"
+    ? value.trim().toLocaleLowerCase("en-US")
+    : "";
 }
 
-function hasOnlyGoogleIdentity(user: VerifiedUser): boolean {
+function hasOnlyGitHubIdentity(user: VerifiedUser): boolean {
   const provider = user.app_metadata?.provider;
-  const providers = user.app_metadata?.providers ?? (provider ? [provider] : []);
-  return provider === "google" && providers.length === 1 && providers[0] === "google";
+  const providers =
+    user.app_metadata?.providers ?? (provider ? [provider] : []);
+
+  return (
+    provider === "github" &&
+    providers.length === 1 &&
+    providers[0] === "github"
+  );
 }
 
 export async function evaluateAdminAuthorization(
@@ -94,7 +106,7 @@ export async function evaluateAdminAuthorization(
     return { status: "unauthorized", reason: "unverified_email" };
   }
 
-  if (!hasOnlyGoogleIdentity(user)) {
+  if (!hasOnlyGitHubIdentity(user)) {
     return { status: "unauthorized", reason: "wrong_provider" };
   }
 
