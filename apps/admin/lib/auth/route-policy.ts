@@ -23,16 +23,17 @@ export function isOptimisticallyAuthorized(
   founderEmail: string,
 ): boolean {
   const provider = claims?.app_metadata?.provider;
-  const providers = claims?.app_metadata?.providers ?? (provider ? [provider] : []);
+  const providers =
+    claims?.app_metadata?.providers ?? (provider ? [provider] : []);
 
   return Boolean(
     claims?.sub &&
     claims.user_role === "admin" &&
     !claims.is_anonymous &&
     normalizeEmail(claims.email) === normalizeEmail(founderEmail) &&
-    provider === "google" &&
+    provider === "github" &&
     providers.length === 1 &&
-    providers[0] === "google",
+    providers[0] === "github",
   );
 }
 
