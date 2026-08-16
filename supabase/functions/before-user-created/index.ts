@@ -35,19 +35,13 @@ Deno.serve(async (request) => {
 
     return jsonResponse(decision, status);
   } catch (error) {
-    console.error(
-      "BEFORE_USER_CREATED_HOOK_ERROR:",
-      error,
-    );
+    console.error("Auth Hook verification failed:", error);
 
     return jsonResponse(
       {
         error: {
           http_code: 401,
-          message:
-            error instanceof Error
-              ? error.message
-              : "Invalid request.",
+          message: "Invalid request.",
         },
       },
       401,
