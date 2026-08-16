@@ -5,20 +5,16 @@ import { createSupabaseServerClient } from "@subtext/supabase/server";
 import type { Route } from "next";
 import { redirect } from "next/navigation";
 
-export async function signInWithGoogle() {
+export async function signInWithGitHub() {
   const supabase = await createSupabaseServerClient();
   const { NEXT_PUBLIC_ADMIN_URL } = readFounderAuthorizationEnvironment();
   const callbackUrl = new URL("/auth/callback", NEXT_PUBLIC_ADMIN_URL).toString();
 
   const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: "google",
+    provider: "github",
     options: {
       redirectTo: callbackUrl,
-      scopes: "openid email profile",
-      queryParams: {
-        access_type: "online",
-        prompt: "select_account",
-      },
+      scopes: "read:user user:email",
     },
   });
 
