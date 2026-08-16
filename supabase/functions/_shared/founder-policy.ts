@@ -24,12 +24,20 @@ export function normalizeEmail(value: unknown): string {
   return typeof value === "string" ? value.trim().toLocaleLowerCase("en-US") : "";
 }
 
-function hasGoogleProvider(metadata: { provider?: string; providers?: string[] } | undefined) {
-  const providers = metadata?.providers ?? (metadata?.provider ? [metadata.provider] : []);
-  return metadata?.provider === "google" && providers.length === 1 && providers[0] === "google";
+function hasGitHubProvider(
+  metadata: { provider?: string; providers?: string[] } | undefined,
+) {
+  const providers =
+    metadata?.providers ?? (metadata?.provider ? [metadata.provider] : []);
+
+  return (
+    metadata?.provider === "github" &&
+    providers.length === 1 &&
+    providers[0] === "github"
+  );
 }
 
-export function isFounderGoogleIdentity(
+export function isFounderGitHubIdentity(
   email: unknown,
   appMetadata: { provider?: string; providers?: string[] } | undefined,
   founderEmail: string,
@@ -37,7 +45,7 @@ export function isFounderGoogleIdentity(
   return (
     normalizeEmail(email) !== "" &&
     normalizeEmail(email) === normalizeEmail(founderEmail) &&
-    hasGoogleProvider(appMetadata)
+    hasGitHubProvider(appMetadata)
   );
 }
 
@@ -45,7 +53,13 @@ export function decideBeforeUserCreated(
   event: BeforeUserCreatedEvent,
   founderEmail: string,
 ): { error?: never } | { error: { http_code: 403; message: "Access denied." } } {
-  if (isFounderGoogleIdentity(event.user?.email, event.user?.app_metadata, founderEmail)) {
+  if (
+    isFounderGitHubIdentity(
+      event.user?.email,
+      event.user?.app_metadata,
+      founderEmail,
+    )
+  ) {
     return {};
   }
 
@@ -62,7 +76,7 @@ export function decideCustomAccessToken(
   founderEmail: string,
 ): { claims: Record<string, unknown> & { user_role: "admin" | null } } {
   const sourceClaims = event.claims ?? {};
-  const authorized = isFounderGoogleIdentity(
+  const authorized = isFounderGitHubIdentity(
     sourceClaims.email,
     sourceClaims.app_metadata,
     founderEmail,
