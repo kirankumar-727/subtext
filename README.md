@@ -1,8 +1,8 @@
 # Subtext Media
 
-Premium, research-driven documentary publishing. Everything has a subtext.
+Premium, research-driven documentary publishing. -*Everything has a subtext*.
 
-## 📂 Repository
+## Repository
 
 This is a private npm-workspaces/Turborepo monorepo with three architectural boundaries:
 
@@ -18,14 +18,14 @@ Shared packages:
 - `packages/typescript-config` — strict shared TypeScript settings
 - `packages/eslint-config` — shared flat ESLint settings
 
-## ⚙️ Requirements
+## Requirements
 
 - Node.js 22.23.2 (see `.nvmrc` and `.node-version`)
 - npm 11+
 - Docker-compatible runtime only when running Supabase locally
 - Supabase CLI is installed as a project development dependency
 
-## 💻 Local setup
+## Local setup
 
 1. Run `npm install`.
 2. Copy `.env.example` to `.env.local` only where needed. Never commit real values.
@@ -34,7 +34,7 @@ Shared packages:
 
 Supabase local services will become runnable with `npm run supabase:start` when Docker is available.
 
-## 🔗 Quality commands
+## Quality commands
 
 - `npm run format:check`
 - `npm run lint`
@@ -43,13 +43,13 @@ Supabase local services will become runnable with `npm run supabase:start` when 
 - `npm run build`
 - `npm run check` — complete local/CI quality gate
 
-## 🔻 Environment contract
+## Environment contract
 
 The root `.env.example` documents every planned variable. Public variables use the
 `NEXT_PUBLIC_` prefix. `SUPABASE_SECRET_KEY`, founder admission data, signing keys, and
 cron/revalidation secrets are server-only and must never enter a browser bundle.
 
-## 🌐 Vercel projects
+## Vercel projects
 
 Create two projects from the same GitHub repository:
 
@@ -62,7 +62,7 @@ Enable source files outside each Root Directory so workspace packages and the ro
 
 Vercel Hobby may be used only while the deployment is eligible under Vercel's non-commercial terms. Upgrade the existing projects before commercial use.
 
-## 📃 Database contract
+## Database contract
 
 All database changes are ordered SQL migrations in `supabase/migrations`. Dashboard schema edits are prohibited.
 
@@ -82,7 +82,7 @@ Generated artifacts:
 
 The rollback SQL in `supabase/rollbacks` is destructive and intended for migration verification before production. It refuses to remove media bucket metadata while Storage objects exist.
 
-## 🈴 Authentication contract
+## Authentication contract
 
 Google OAuth is the only identity path. Signed Supabase Auth hooks enforce exact-email admission and issue the `user_role=admin` RLS claim only to the configured founder. Next.js Proxy performs early session refresh/rejection; protected layouts, APIs, server actions, and privileged-client gateways repeat authorization on the server.
 
@@ -96,7 +96,7 @@ Google OAuth is the only identity path. Signed Supabase Auth hooks enforce exact
 
 See `docs/authentication/` for setup, session lifecycle, failure handling, RLS interaction, and the generated flow diagram.
 
-## 📲 Launch validation
+## Launch validation
 
 - `npm run launch:env:test` — fail-closed environment contract tests
 - `npm run launch:env -- --target=<public|admin|supabase-functions|operator|all>` — validate private production configuration without printing values
@@ -107,7 +107,7 @@ See `docs/authentication/` for setup, session lifecycle, failure handling, RLS i
 
 See `docs/launch/README.md` for current blockers and sign-off requirements.
 
-## 🎯 Milestone status
+## Milestone status
 
 - [x] M1 — Monorepo and application foundation
 - [x] M2 — Database schema, RLS, Storage policy, generated types, and synchronized documentation
