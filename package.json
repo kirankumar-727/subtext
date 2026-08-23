@@ -64,13 +64,13 @@
   },
   "packageManager": "npm@11.19.0",
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.4",
+    "@electric-sql/pglite": "0.5.5",
     "@viz-js/viz": "3.29.0",
     "deno": "2.9.5",
     "prettier": "3.9.6",
-    "supabase": "2.112.0",
-    "turbo": "2.10.8",
+    "supabase": "2.115.0",
+    "turbo": "2.10.11",
     "typescript": "5.9.3",
-    "vitest": "4.1.10"
+    "vitest": "4.1.11"
   }
 }
