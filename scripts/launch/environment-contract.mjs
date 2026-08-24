@@ -1,17 +1,35 @@
-const commonPublic = [
-  { name: "NEXT_PUBLIC_SUPABASE_URL", kind: "https-url", destination: "Vercel" },
-  { name: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY", kind: "publishable-key", destination: "Vercel" },
-];
+export const ENVIRONMENT_MODE_VARIABLE = "SUBTEXT_ENVIRONMENT";
+export const environmentModes = Object.freeze(["production", "staging"]);
+
+const originPolicies = Object.freeze({
+  publicSite: Object.freeze({
+    production: "https://subtext.media",
+    staging: "https://<project>.vercel.app",
+  }),
+  adminSite: Object.freeze({
+    production: "https://admin.subtext.media",
+    staging: "https://<project>.vercel.app",
+  }),
+});
 
 export const environmentTargets = {
   public: [
     {
       name: "NEXT_PUBLIC_SITE_URL",
       kind: "https-url",
-      expectedOrigin: "https://subtext.media",
+      originPolicy: "publicSite",
       destination: "Vercel Public",
     },
-    ...commonPublic.map((item) => ({ ...item, destination: "Vercel Public" })),
+    {
+      name: "NEXT_PUBLIC_SUPABASE_URL",
+      kind: "https-url",
+      destination: "Vercel Public",
+    },
+    {
+      name: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      kind: "publishable-key",
+      destination: "Vercel Public",
+    },
     { name: "REVALIDATION_SECRET", kind: "secret", destination: "Vercel Public" },
     { name: "PUBLISHING_WORKER_SECRET", kind: "secret", destination: "Vercel Public" },
     { name: "CRON_SECRET", kind: "secret", destination: "Vercel Public" },
@@ -20,16 +38,25 @@ export const environmentTargets = {
     {
       name: "NEXT_PUBLIC_SITE_URL",
       kind: "https-url",
-      expectedOrigin: "https://subtext.media",
+      originPolicy: "publicSite",
       destination: "Vercel Admin",
     },
     {
       name: "NEXT_PUBLIC_ADMIN_URL",
       kind: "https-url",
-      expectedOrigin: "https://admin.subtext.media",
+      originPolicy: "adminSite",
       destination: "Vercel Admin",
     },
-    ...commonPublic.map((item) => ({ ...item, destination: "Vercel Admin" })),
+    {
+      name: "NEXT_PUBLIC_SUPABASE_URL",
+      kind: "https-url",
+      destination: "Vercel Admin",
+    },
+    {
+      name: "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
+      kind: "publishable-key",
+      destination: "Vercel Admin",
+    },
     { name: "SUPABASE_SECRET_KEY", kind: "secret-key", destination: "Vercel Admin" },
     { name: "FOUNDER_EMAIL", kind: "email", destination: "Vercel Admin" },
     { name: "PUBLISHING_WORKER_SECRET", kind: "secret", destination: "Vercel Admin" },
@@ -62,7 +89,7 @@ export const environmentTargets = {
     {
       name: "PUBLICATION_API_URL",
       kind: "https-url",
-      expectedOrigin: "https://subtext.media",
+      originPolicy: "publicSite",
       destination: "Supabase Edge Functions",
     },
     { name: "REVALIDATION_SECRET", kind: "secret", destination: "Supabase Edge Functions" },
@@ -93,7 +120,7 @@ export const environmentTargets = {
     {
       name: "NEXT_PUBLIC_ADMIN_URL",
       kind: "https-url",
-      expectedOrigin: "https://admin.subtext.media",
+      originPolicy: "adminSite",
       destination: "Operator/CI only",
     },
     { name: "NEXT_PUBLIC_SUPABASE_URL", kind: "https-url", destination: "Operator/CI only" },
@@ -101,13 +128,50 @@ export const environmentTargets = {
 };
 
 const placeholderPattern = /replace|example\.com|your-project|change[-_ ]?me/i;
+const stagingVercelOriginPattern = /^https:\/\/[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.vercel\.app$/;
+
+export function validateEnvironmentMode(mode) {
+  const value = typeof mode === "string" ? mode.trim() : "";
+  if (!value)
+    return [`${ENVIRONMENT_MODE_VARIABLE}: missing (set it explicitly to production or staging)`];
+  if (!environmentModes.includes(value))
+    return [`${ENVIRONMENT_MODE_VARIABLE}: invalid value (expected exactly production or staging)`];
+  return [];
+}
+
+function validateOrigin(name, value, mode, originPolicy) {
+  const errors = [];
+  let url;
+  try {
+    url = new URL(value);
+  } catch {
+    return [`${name}: invalid URL`];
+  }
+
+  if (url.protocol !== "https:") errors.push(`${name}: HTTPS required`);
+  if (url.username || url.password || url.pathname !== "/" || url.search || url.hash)
+    errors.push(`${name}: must be an HTTPS origin without credentials or a path`);
+
+  if (mode === "production") {
+    const expectedOrigin = originPolicies[originPolicy].production;
+    if (url.origin !== expectedOrigin) errors.push(`${name}: expected ${expectedOrigin}`);
+  } else if (!stagingVercelOriginPattern.test(url.origin)) {
+    errors.push(`${name}: staging requires an HTTPS *.vercel.app origin`);
+  }
+  return errors;
+}
 
 export function validateEnvironment(target, environment) {
+  const input = environment ?? {};
+  const modeErrors = validateEnvironmentMode(input[ENVIRONMENT_MODE_VARIABLE]);
+  if (modeErrors.length) return modeErrors;
+
+  const mode = input[ENVIRONMENT_MODE_VARIABLE].trim();
   const definitions = environmentTargets[target];
   if (!definitions) return [`Unknown environment target: ${target}`];
   const errors = [];
   for (const definition of definitions) {
-    const value = environment[definition.name]?.trim() ?? "";
+    const value = input[definition.name]?.trim() ?? "";
     if (!value) {
       if (definition.providerManaged) continue;
       errors.push(`${definition.name}: missing`);
@@ -115,13 +179,15 @@ export function validateEnvironment(target, environment) {
     }
     if (placeholderPattern.test(value)) errors.push(`${definition.name}: placeholder value`);
     if (definition.kind === "https-url") {
-      try {
-        const url = new URL(value);
-        if (url.protocol !== "https:") errors.push(`${definition.name}: HTTPS required`);
-        if (definition.expectedOrigin && url.origin !== definition.expectedOrigin)
-          errors.push(`${definition.name}: expected ${definition.expectedOrigin}`);
-      } catch {
-        errors.push(`${definition.name}: invalid URL`);
+      if (definition.originPolicy)
+        errors.push(...validateOrigin(definition.name, value, mode, definition.originPolicy));
+      else {
+        try {
+          const url = new URL(value);
+          if (url.protocol !== "https:") errors.push(`${definition.name}: HTTPS required`);
+        } catch {
+          errors.push(`${definition.name}: invalid URL`);
+        }
       }
     }
     if (definition.kind === "email" && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value))
@@ -150,11 +216,11 @@ export function validateEnvironment(target, environment) {
   }
   const secrets = definitions
     .filter((item) => ["secret", "secret-key", "webhook-secret"].includes(item.kind))
-    .map((item) => environment[item.name])
+    .map((item) => input[item.name])
     .filter(Boolean);
   if (new Set(secrets).size !== secrets.length)
     errors.push("Secrets assigned to this target must be distinct");
-  for (const name of Object.keys(environment)) {
+  for (const name of Object.keys(input)) {
     if (name.startsWith("NEXT_PUBLIC_") && /SECRET|TOKEN|FOUNDER|PASSWORD|SERVICE/i.test(name))
       errors.push(`${name}: privileged value must not be public`);
   }

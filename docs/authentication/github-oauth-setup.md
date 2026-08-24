@@ -2,6 +2,8 @@
 
 Subtext uses GitHub OAuth through Supabase Auth. GitHub proves identity; Subtext separately decides whether that verified identity is the configured founder.
 
+Staging and production provider, hook, and deployment changes are authorized operator actions. Arena can inspect this repository but must not execute or claim those external actions.
+
 No database or Auth setting should be changed manually without an equivalent committed configuration or an approved deployment command.
 
 ## Required environment variables
@@ -52,7 +54,10 @@ Store the GitHub Client ID and Client Secret outside the repository. Subtext req
 GitHub returns to Supabase Auth. Supabase then redirects to the exact application callback:
 
 - Local: `http://localhost:3001/auth/callback`
+- Staging: `https://<ADMIN_STAGING_HOST>/auth/callback`
 - Production: `https://admin.subtext.media/auth/callback`
+
+Use only the staging callback during initial staging activation. Do not add production custom domains to the staging OAuth App.
 
 ## Supabase Auth configuration
 

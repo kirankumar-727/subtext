@@ -1,8 +1,10 @@
 # Production Readiness Checklist
 
+This checklist is production-only. It does not authorize initial staging activation, production DNS changes, or production deployment. Keep every item unchecked until an authorized operator supplies the required evidence.
+
 ## Infrastructure
 
-- [ ] Confirm legal/operational control of `subtext.media`; current origin is an unrelated Shopify storefront.
+- [ ] Confirm legal/operational control of `subtext.media`; the recorded domain audit describes an unrelated Shopify storefront at the origin and requires fresh operator verification.
 - [ ] Confirm Cloudflare zone and registrar access; inventory existing DNS/MX/TXT records before changes.
 - [ ] Create Supabase production project in the approved region.
 - [ ] Apply all migrations only through CLI/CI.
@@ -15,7 +17,7 @@
 
 ## Identity and secrets
 
-- [ ] Run `npm run launch:env -- --target=all` in a secure environment.
+- [ ] Run `SUBTEXT_ENVIRONMENT=production npm run launch:env -- --target=all` in a secure environment.
 - [ ] Configure GitHub OAuth callback URIs.
 - [ ] Apply Supabase Auth configuration using the committed script.
 - [ ] Verify wrong GitHub identity is rejected before account creation.
