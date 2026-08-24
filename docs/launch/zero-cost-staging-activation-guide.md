@@ -23,8 +23,8 @@ The current domain audit shows the apex serving Shopify and the admin subdomain 
 | Source/CI                       | Existing private GitHub repository and GitHub Free               | **[FREE]**               | Use the existing `main` branch and Actions allowance                              |
 | Database/Auth/Storage/Functions | One Supabase Free project                                        | **[FREE]**               | Reserve the second free project for later production or isolated recovery testing |
 | Public app                      | One Vercel Hobby project using its stable `.vercel.app` URL      | **[FREE]**               | Staging must remain non-commercial and within Hobby terms                         |
-| Admin app                       | A second Vercel Hobby project using its stable `.vercel.app` URL | **[FREE]**               | The application’s Google/founder authorization remains the security boundary      |
-| Google login                    | Google Cloud OAuth 2.0 Web Application client                    | **[FREE]**               | Request only `openid email profile`                                               |
+| Admin app                       | A second Vercel Hobby project using its stable `.vercel.app` URL | **[FREE]**               | The application’s GitHub/founder authorization remains the security boundary      |
+| GitHub login                    | GitHub OAuth App                                                 | **[FREE]**               | Request only `read:user user:email`                                               |
 | Publishing worker               | Supabase Edge Function                                           | **[FREE]**               | Stay within Free function invocation/resource limits                              |
 | Recovery Cron                   | Vercel Hobby daily Cron plus immediate CMS dispatch              | **[FREE]**               | Hobby permits only one Cron execution per day                                     |
 | DNS                             | No staging DNS change                                            | **[DO NOT DO YET]**      | Use `.vercel.app`; leave Shopify and mail records untouched                       |
@@ -149,12 +149,11 @@ Prefix the two Auth-hook base64 values with `v1,whsec_`.
 
 - **[DO NOT DO YET]** Do not put these values into `.env.example` or any committed file.
 
-## Step 4 — Create the Google OAuth staging client
+## Step 4 — Create the GitHub OAuth staging App
 
-- **[FREE]** Create or select a Google Cloud project.
-- **[FREE]** Configure the OAuth consent screen for the founder-operated staging application.
-- **[FREE]** Create an OAuth Client ID of type **Web application**.
-- **[FREE]** Authorized JavaScript origin:
+- **[FREE]** Open GitHub **Settings → Developer settings → OAuth Apps → New OAuth App**.
+- **[FREE]** Set the application name to the founder-operated staging application.
+- **[FREE]** Set the homepage URL to the stable Admin Vercel URL:
 
 ```text
 https://subtext-admin-staging.vercel.app
@@ -162,15 +161,15 @@ https://subtext-admin-staging.vercel.app
 
 Use the actual stable Admin Vercel URL if the suggested name was unavailable.
 
-- **[FREE]** Authorized redirect URI—this is the Supabase callback, not the Admin callback:
+- **[FREE]** Set the authorization callback URL—this is the Supabase callback, not the Admin callback:
 
 ```text
 https://<STAGING_PROJECT_REF>.supabase.co/auth/v1/callback
 ```
 
-- **[FREE]** Store the Google client ID and client secret privately.
-- **[DO NOT DO YET]** Do not add `admin.subtext.media` to Google OAuth.
-- **[DO NOT DO YET]** Do not request Gmail, Drive or other Google API scopes.
+- **[FREE]** Store the GitHub client ID and client secret privately.
+- **[DO NOT DO YET]** Do not add `admin.subtext.media` to the GitHub OAuth App.
+- **[DO NOT DO YET]** Do not request unrelated GitHub API scopes. The configured flow needs only `read:user user:email`.
 
 ## Step 5 — Deploy the two Auth-hook functions
 
@@ -243,10 +242,11 @@ apps/admin
 | `NEXT_PUBLIC_ADMIN_URL`                | Stable Admin staging `.vercel.app` URL        |
 | `NEXT_PUBLIC_SUPABASE_URL`             | Supabase staging project URL                  |
 | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Supabase staging publishable key              |
-| `FOUNDER_EMAIL`                        | Exact founder Google email; server-only       |
+| `SUPABASE_SECRET_KEY`                  | Supabase staging secret key; server-only      |
+| `FOUNDER_EMAIL`                        | Exact founder GitHub email; server-only       |
 | `PUBLISHING_WORKER_SECRET`             | Same staging worker secret used by the worker |
 
-Do not configure `SUPABASE_SECRET_KEY` in Vercel Admin for the current MVP; CMS operations use the founder JWT and RLS. Keep least privilege.
+Configure `SUPABASE_SECRET_KEY` only as a server-only Vercel Admin variable. The CMS normally uses the founder JWT and RLS; the explicit privileged-client gateway must remain the only path for any RLS-bypassing operation. Keep the value out of browser variables and logs.
 
 - **[FREE]** Deploy to the stable staging project alias.
 - **[FREE]** Confirm `/admin` redirects to `/login`, `/api/admin/session` returns 401 without a session, and `/robots.txt` disallows all.
@@ -281,14 +281,14 @@ npx supabase functions deploy publishing-worker --project-ref <STAGING_PROJECT_R
 
 ## Step 9 — Apply Supabase Auth provider and hook configuration
 
-Run this only after the stable Admin staging URL, Google client and deployed hooks exist.
+Run this only after the stable Admin staging URL, GitHub OAuth App and deployed hooks exist.
 
 - **[FREE]** In a secure terminal session, provide the committed configuration script with:
   - `SUPABASE_PROJECT_REF`;
   - `SUPABASE_ACCESS_TOKEN`;
   - `NEXT_PUBLIC_ADMIN_URL` set to the stable Admin staging URL;
   - `NEXT_PUBLIC_SUPABASE_URL`;
-  - Google client ID and secret;
+  - GitHub client ID and secret;
   - both Auth-hook secrets.
 
 - **[FREE]** Validate without applying:
@@ -303,12 +303,12 @@ npm run auth:configure
 npm run auth:configure -- --apply
 ```
 
-This enables only Google, disables email/phone/anonymous login, sets the exact callback allowlist and configures both signed HTTP hooks.
+This enables only GitHub, disables email/phone/anonymous login, sets the exact callback allowlist and configures both signed HTTP hooks.
 
 - **[FREE]** Verify in Supabase Auth settings:
   - Site URL is the stable Admin staging URL;
   - allowed redirect is `<ADMIN_STAGING_URL>/auth/callback`;
-  - Google is enabled;
+  - GitHub is enabled;
   - email, phone and anonymous login are disabled;
   - other OAuth providers remain disabled;
   - both HTTP hooks are enabled with the correct Function URLs.
@@ -352,10 +352,10 @@ npm run launch:build-audit
 
 - **[FREE]** Open the stable Admin staging URL in a private browser window.
 - **[FREE]** Confirm `/admin` redirects to Login.
-- **[FREE]** Sign in with the exact founder Google account.
+- **[FREE]** Sign in with the exact founder GitHub account.
 - **[FREE]** Confirm the Writer Workspace opens.
 - **[FREE]** Sign out and confirm direct Admin/API access is rejected.
-- **[FREE]** In another private browser profile, try a different Google account.
+- **[FREE]** In another private browser profile, try a different GitHub account.
 - **[FREE]** Confirm Access Denied and no CMS/API data.
 - **[FREE]** Confirm Supabase Auth did not create an unauthorized user row.
 
@@ -535,7 +535,7 @@ Every item in this section is **[PRODUCTION ONLY] [DO NOT DO YET]**.
 6. Create/configure the separate Supabase production project; never reuse staging data as production by changing URLs in place.
 7. Apply migrations, deploy functions and run the full CMS lifecycle on the production project before DNS.
 8. Add `subtext.media` to the Vercel Public project and `admin.subtext.media` to the Vercel Admin project; collect the exact verification/A/CNAME records Vercel supplies.
-9. Update Google OAuth, Supabase Site URL/allowlist, Vercel environment variables and worker coordinator URL to the final domains.
+9. Update GitHub OAuth, Supabase Site URL/allowlist, Vercel environment variables and worker coordinator URL to the final domains.
 10. Lower only the relevant web-record TTL if authorized. Do not alter mail records.
 11. Change only the apex/www web records required for Public and add only the Admin subdomain record.
 12. Verify TLS, canonical metadata, redirects, robots, sitemap, RSS, Auth and worker before announcing cutover.
@@ -553,12 +553,12 @@ Staging is activated only when all boxes are checked:
 
 - [ ] Supabase Free project created and migrations/seed applied.
 - [ ] Auth hooks deployed and signed.
-- [ ] Google OAuth exact callback configured.
+- [ ] GitHub OAuth exact callback configured.
 - [ ] Public stable `.vercel.app` URL deployed.
 - [ ] Admin stable `.vercel.app` URL deployed.
 - [ ] Publishing worker deployed with provider-managed secret-key dictionary present.
 - [ ] Vercel Hobby daily Cron deployed successfully.
-- [ ] Founder login succeeds and another Google account is rejected.
+- [ ] Founder login succeeds and another GitHub account is rejected.
 - [ ] Real article was created only through CMS with rights-cleared images and source.
 - [ ] Publish A, publish B, rollback A, unpublish and republish all succeeded.
 - [ ] Search, sitemap, RSS, canonical metadata and 301 redirect passed.

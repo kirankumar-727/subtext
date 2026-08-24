@@ -30,6 +30,7 @@ export const environmentTargets = {
       destination: "Vercel Admin",
     },
     ...commonPublic.map((item) => ({ ...item, destination: "Vercel Admin" })),
+    { name: "SUPABASE_SECRET_KEY", kind: "secret-key", destination: "Vercel Admin" },
     { name: "FOUNDER_EMAIL", kind: "email", destination: "Vercel Admin" },
     { name: "PUBLISHING_WORKER_SECRET", kind: "secret", destination: "Vercel Admin" },
   ],
@@ -70,12 +71,12 @@ export const environmentTargets = {
     { name: "SUPABASE_PROJECT_REF", kind: "project-ref", destination: "Operator/CI only" },
     { name: "SUPABASE_ACCESS_TOKEN", kind: "secret", destination: "Operator/CI only" },
     {
-      name: "SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID",
-      kind: "google-client",
+      name: "SUPABASE_AUTH_EXTERNAL_GITHUB_CLIENT_ID",
+      kind: "github-client",
       destination: "Operator/CI only",
     },
     {
-      name: "SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET",
+      name: "SUPABASE_AUTH_EXTERNAL_GITHUB_SECRET",
       kind: "secret",
       destination: "Operator/CI only",
     },
@@ -144,8 +145,8 @@ export function validateEnvironment(target, environment) {
       errors.push(`${definition.name}: invalid Standard Webhooks secret`);
     if (definition.kind === "project-ref" && !/^[a-z]{20}$/.test(value))
       errors.push(`${definition.name}: invalid project ref`);
-    if (definition.kind === "google-client" && !value.endsWith(".apps.googleusercontent.com"))
-      errors.push(`${definition.name}: invalid Google client ID`);
+    if (definition.kind === "github-client" && !/^[A-Za-z0-9_.-]{8,64}$/.test(value))
+      errors.push(`${definition.name}: invalid GitHub client ID`);
   }
   const secrets = definitions
     .filter((item) => ["secret", "secret-key", "webhook-secret"].includes(item.kind))

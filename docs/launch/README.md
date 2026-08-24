@@ -11,7 +11,7 @@ Two externally observed blockers are material:
 2. `admin.subtext.media` does not currently resolve in DNS.
 3. Authoritative nameservers currently resolve to Google Domains (`ns-cloud-d*.googledomains.com`), not Cloudflare.
 
-No private Supabase, Google or Vercel credentials are present—and none should be supplied in chat—so Google login, Auth hooks, production RLS, Storage, worker, Cron, revalidation and the real article lifecycle remain pending operator execution. See [domain-audit.md](./domain-audit.md) for the non-secret DNS evidence.
+No private Supabase, GitHub or Vercel credentials are present—and none should be supplied in chat—so GitHub login, Auth hooks, production RLS, Storage, worker, Cron, revalidation and the real article lifecycle remain pending operator execution. See [domain-audit.md](./domain-audit.md) for the non-secret DNS evidence.
 
 ## Pre-deployment gates passed
 
@@ -30,7 +30,7 @@ No private Supabase, Google or Vercel credentials are present—and none should 
 
 - Resolve domain ownership/intent and replace the current Shopify DNS only when authorized.
 - Create/configure isolated Supabase production and staging projects.
-- Configure Google OAuth and both signed Auth hooks.
+- Configure GitHub OAuth and both signed Auth hooks.
 - Deploy Vercel Public/Admin and the Supabase publishing worker.
 - Run the environment contract against private production configuration.
 - Use the actual authenticated CMS to create the launch-validation story.

@@ -3,37 +3,62 @@
 
 import { MarkdownRenderer } from "@subtext/content";
 import "@subtext/content/styles.css";
+import { getSupabaseBrowserClient } from "@subtext/supabase/browser";
 import Link from "next/link";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { requestStoryPublication, saveStoryDraft } from "@/app/admin/cms-actions";
+import {
+  createMediaUploadIntent,
+  createSourceInline,
+  createTag,
+  finalizeMediaUpload,
+  requestStoryPublication,
+  saveStoryDraft,
+} from "@/app/admin/cms-actions";
 import {
   AUTOSAVE_DELAY_MS,
+  rebaseDraftOntoServer,
   serializeDraftContent,
   shouldRecoverLocalDraft,
 } from "@/lib/cms/autosave";
 import type { StoryData, WorkspaceReferenceData } from "@/lib/cms/queries";
-import type { SaveState, StoryDraftInput } from "@/lib/cms/types";
+import type {
+  MediaItem,
+  SaveState,
+  SourceItem,
+  SourceType,
+  StoryDraftInput,
+} from "@/lib/cms/types";
 
 type EditorState = StoryDraftInput;
+type DraftConflict = {
+  local: EditorState;
+  server: EditorState | null;
+};
 
-function saveLabel(state: SaveState) {
-  return {
-    idle: "Saved",
-    unsaved: "Unsaved changes",
-    saving: "Saving…",
-    saved: "Saved",
-    error: "Error",
-  }[state];
+function hex(bytes: ArrayBuffer) {
+  return [...new Uint8Array(bytes)].map((value) => value.toString(16).padStart(2, "0")).join("");
+}
+
+function saveLabel(state: SaveState, lastSavedAt: Date | null) {
+  if (state === "saving") return "Saving…";
+  if (state === "unsaved") return "Unsaved changes";
+  if (state === "error") return "Save error";
+  if (lastSavedAt) {
+    return `Saved (${lastSavedAt.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit", second: "2-digit" })})`;
+  }
+  return "Saved";
 }
 
 export function StoryEditor({
   story,
-  reference,
+  reference: initialReference,
 }: {
   story: StoryData;
   reference: WorkspaceReferenceData;
 }) {
   const revision = story.revision;
+  const [reference, setReference] = useState<WorkspaceReferenceData>(initialReference);
+
   const [draft, setDraft] = useState<EditorState>({
     articleId: story.article.id,
     rowVersion: story.article.row_version,
@@ -49,9 +74,41 @@ export function StoryEditor({
     seoTitle: revision?.seo_title ?? "",
     seoDescription: revision?.seo_description ?? "",
   });
+
   const [status, setStatus] = useState<SaveState>("idle");
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
   const [message, setMessage] = useState("");
+  const [messageType, setMessageType] = useState<"info" | "error" | "success">("info");
   const [preview, setPreview] = useState(true);
+  const [isPublishing, setIsPublishing] = useState(false);
+  const [conflict, setConflict] = useState<DraftConflict | null>(null);
+  const saveAfterConflict = useRef(false);
+
+  // Panel state for Tags, Cover, Sources
+  const [tagQuery, setTagQuery] = useState("");
+  const [newTagName, setNewTagName] = useState("");
+  const [isCreatingTag, setIsCreatingTag] = useState(false);
+
+  const [sourceQuery, setSourceQuery] = useState("");
+  const [showAddSource, setShowAddSource] = useState(false);
+  const [isCreatingSource, setIsCreatingSource] = useState(false);
+  const [newSourceTitle, setNewSourceTitle] = useState("");
+  const [newSourceType, setNewSourceType] = useState<SourceType>("website");
+  const [newSourceAuthor, setNewSourceAuthor] = useState("");
+  const [newSourcePublisher, setNewSourcePublisher] = useState("");
+  const [newSourceUrl, setNewSourceUrl] = useState("");
+
+  const [showMediaUpload, setShowMediaUpload] = useState(false);
+  const [uploadStatus, setUploadStatus] = useState<
+    "idle" | "hashing" | "uploading" | "processing" | "complete" | "error"
+  >("idle");
+  const [uploadError, setUploadError] = useState("");
+  const [uploadAltText, setUploadAltText] = useState("");
+  const [uploadCaption, setUploadCaption] = useState("");
+  const [uploadCredit, setUploadCredit] = useState("");
+  const [uploadRights, setUploadRights] = useState("owned");
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inFlight = useRef(false);
   const latestDraft = useRef(draft);
@@ -64,63 +121,105 @@ export function StoryEditor({
   }, [draft]);
 
   const persist = useCallback(async () => {
-    if (inFlight.current) return false;
+    if (inFlight.current || conflict) return false;
     inFlight.current = true;
     const payload = latestDraft.current;
     const payloadSnapshot = serializeDraftContent(payload);
     setStatus("saving");
+
     let result: Awaited<ReturnType<typeof saveStoryDraft>>;
     try {
       result = await saveStoryDraft(payload);
     } catch {
       inFlight.current = false;
       setStatus("error");
-      setMessage("Draft could not be saved. Local changes are preserved.");
+      setMessageType("error");
+      setMessage("Draft could not be saved to the database. Local changes are preserved.");
       return false;
     }
+
     inFlight.current = false;
+
     if (!result.ok) {
       setStatus("error");
-      setMessage(result.message);
+      setMessageType("error");
+      if (result.code === "conflict") {
+        setConflict({ local: payload, server: result.currentDraft });
+        setMessage(
+          result.currentDraft
+            ? "Another session saved this story. Choose whether to reload the server draft or replace it with your local draft."
+            : "Another session saved this story. Refresh the page before making further changes.",
+        );
+      } else {
+        setMessage(result.message);
+      }
       return false;
     }
-    setDraft((current) => ({ ...current, rowVersion: result.value.row_version }));
+
+    setDraft((current) => ({ ...current, rowVersion: Number(result.value.row_version) }));
+    setLastSavedAt(new Date());
+
     if (serializeDraftContent(latestDraft.current) === payloadSnapshot) {
       savedSnapshot.current = payloadSnapshot;
-      localStorage.removeItem(storageKey);
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {
+        // Ignore localStorage access errors
+      }
       setStatus("saved");
-      setMessage("");
+      if (messageType !== "success") {
+        setMessage("");
+      }
     } else {
       setStatus("unsaved");
     }
     return true;
-  }, [storageKey]);
+  }, [conflict, messageType, storageKey]);
 
+  // Local recovery on initial load
   useEffect(() => {
-    const local = localStorage.getItem(storageKey);
-    if (!local) return;
     try {
-      const recovered = JSON.parse(local) as { draft: EditorState; baseRowVersion: number };
-      if (shouldRecoverLocalDraft(recovered, story.article.row_version)) {
+      const local = localStorage.getItem(storageKey);
+      if (!local) return;
+      const recovered: unknown = JSON.parse(local);
+
+      if (shouldRecoverLocalDraft(recovered, story.article.row_version, story.article.id)) {
         queueMicrotask(() => {
           setDraft(recovered.draft);
           setStatus("unsaved");
-          setMessage("Recovered unsaved local changes.");
+          setMessageType("info");
+          setMessage("Recovered unsaved local edits from browser cache.");
         });
       }
     } catch {
-      localStorage.removeItem(storageKey);
+      try {
+        localStorage.removeItem(storageKey);
+      } catch {
+        // Ignore
+      }
     }
-  }, [storageKey, story.article.row_version]);
+  }, [storageKey, story.article.id, story.article.row_version]);
 
+  // Autosave debounce timer
   useEffect(() => {
-    if (contentSnapshot === savedSnapshot.current) return;
+    if (conflict || contentSnapshot === savedSnapshot.current) return;
     setStatus((current) => (current === "saving" ? current : "unsaved"));
-    localStorage.setItem(storageKey, JSON.stringify({ draft, baseRowVersion: draft.rowVersion }));
+    try {
+      localStorage.setItem(storageKey, JSON.stringify({ draft, baseRowVersion: draft.rowVersion }));
+    } catch {
+      // Ignore
+    }
     const timer = window.setTimeout(() => void persist(), AUTOSAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
-  }, [contentSnapshot, draft, persist, storageKey]);
+  }, [conflict, contentSnapshot, draft, persist, storageKey]);
 
+  useEffect(() => {
+    if (!saveAfterConflict.current || conflict) return;
+    saveAfterConflict.current = false;
+    void persist();
+  }, [conflict, persist]);
+
+  // Keyboard shortcut: Cmd+S / Ctrl+S
   useEffect(() => {
     const onKeyDown = (event: KeyboardEvent) => {
       if ((event.metaKey || event.ctrlKey) && event.key.toLowerCase() === "s") {
@@ -160,23 +259,292 @@ export function StoryEditor({
     );
   }
 
+  function reloadServerDraft() {
+    if (!conflict?.server) return;
+    const serverDraft = conflict.server;
+    latestDraft.current = serverDraft;
+    setDraft(serverDraft);
+    savedSnapshot.current = serializeDraftContent(serverDraft);
+    try {
+      localStorage.removeItem(storageKey);
+    } catch {
+      // Ignore localStorage access errors
+    }
+    setConflict(null);
+    saveAfterConflict.current = false;
+    setStatus("saved");
+    setMessageType("info");
+    setMessage(
+      "Loaded the latest server draft. Your local draft was discarded after your explicit choice.",
+    );
+  }
+
+  function replaceServerWithLocalDraft() {
+    if (!conflict?.server) return;
+    const rebasedDraft = rebaseDraftOntoServer(latestDraft.current, conflict.server);
+    latestDraft.current = rebasedDraft;
+    setDraft(rebasedDraft);
+    setConflict(null);
+    saveAfterConflict.current = true;
+    setStatus("unsaved");
+    setMessageType("info");
+    setMessage(
+      "Your local draft was explicitly rebased onto the latest server version and will be saved as a new draft.",
+    );
+  }
+
+  async function handleCreateTag(e: React.FormEvent) {
+    e.preventDefault();
+    const name = newTagName.trim();
+    if (!name) return;
+    setIsCreatingTag(true);
+    try {
+      const result = await createTag({ name });
+      if (result.ok && result.tag) {
+        const created = result.tag;
+        setReference((prev) => ({
+          ...prev,
+          tags: prev.tags.some((t) => t.id === created.id) ? prev.tags : [...prev.tags, created],
+        }));
+        if (!draft.tagIds.includes(created.id)) {
+          update("tagIds", [...draft.tagIds, created.id]);
+        }
+        setNewTagName("");
+      }
+    } catch {
+      setMessageType("error");
+      setMessage("Tag could not be created. Check the name and retry.");
+    } finally {
+      setIsCreatingTag(false);
+    }
+  }
+
+  async function handleCreateSource(e: React.FormEvent, andCite = false) {
+    e.preventDefault();
+    const title = newSourceTitle.trim();
+    if (!title) return;
+    setIsCreatingSource(true);
+    try {
+      const payload: Parameters<typeof createSourceInline>[0] = {
+        title,
+        sourceType: newSourceType,
+      };
+      if (newSourceAuthor.trim()) payload.authorText = newSourceAuthor.trim();
+      if (newSourcePublisher.trim()) payload.publisher = newSourcePublisher.trim();
+      if (newSourceUrl.trim()) payload.url = newSourceUrl.trim();
+
+      const result = await createSourceInline(payload);
+      if (result.ok && result.source) {
+        const created = result.source;
+        setReference((prev) => ({
+          ...prev,
+          sources: [created, ...prev.sources.filter((s) => s.id !== created.id)] as SourceItem[],
+        }));
+        const newIds = draft.sourceIds.includes(created.id)
+          ? draft.sourceIds
+          : [...draft.sourceIds, created.id];
+        update("sourceIds", newIds);
+
+        if (andCite) {
+          const citationIndex = newIds.indexOf(created.id);
+          insertAtCursor(`[^src-${citationIndex + 1}]`);
+        }
+
+        setNewSourceTitle("");
+        setNewSourceAuthor("");
+        setNewSourcePublisher("");
+        setNewSourceUrl("");
+        setShowAddSource(false);
+      }
+    } catch {
+      setMessageType("error");
+      setMessage("Source could not be created. Check the required fields and retry.");
+    } finally {
+      setIsCreatingSource(false);
+    }
+  }
+
+  async function handleMediaUpload(e: React.FormEvent) {
+    e.preventDefault();
+    const file = fileInputRef.current?.files?.[0];
+    if (!file || !file.size) {
+      setUploadError("Please select an image file.");
+      return;
+    }
+    if (!["image/jpeg", "image/png", "image/webp", "image/avif"].includes(file.type)) {
+      setUploadError("Choose a JPEG, PNG, WebP, or AVIF image.");
+      return;
+    }
+    if (file.size > 25 * 1024 * 1024) {
+      setUploadError("Images must be 25 MB or smaller.");
+      return;
+    }
+    if (!uploadAltText.trim()) {
+      setUploadError("Alternative text is required for accessibility and publication validation.");
+      return;
+    }
+
+    setUploadStatus("hashing");
+    setUploadError("");
+
+    try {
+      const checksumSha256 = hex(await crypto.subtle.digest("SHA-256", await file.arrayBuffer()));
+      const uploadPayload: Parameters<typeof createMediaUploadIntent>[0] = {
+        filename: file.name,
+        mimeType: file.type,
+        byteSize: file.size,
+        checksumSha256,
+        altText: uploadAltText.trim(),
+        rightsStatus: uploadRights,
+      };
+      if (uploadCaption.trim()) uploadPayload.caption = uploadCaption.trim();
+      if (uploadCredit.trim()) uploadPayload.credit = uploadCredit.trim();
+
+      const intent = await createMediaUploadIntent(uploadPayload);
+
+      setUploadStatus("uploading");
+      const supabase = getSupabaseBrowserClient();
+      const upload = await supabase.storage
+        .from("media-originals")
+        .uploadToSignedUrl(intent.path, intent.token, file, { contentType: file.type });
+      if (upload.error) throw new Error("Original image upload failed. Please retry.");
+
+      setUploadStatus("processing");
+      const finalResult = await finalizeMediaUpload(intent.id);
+
+      if (finalResult.ok && finalResult.media) {
+        const createdMedia = finalResult.media;
+        setReference((prev) => ({
+          ...prev,
+          media: [
+            createdMedia,
+            ...prev.media.filter((m) => m.id !== createdMedia.id),
+          ] as MediaItem[],
+        }));
+        update("coverMediaAssetId", createdMedia.id);
+        setUploadStatus("complete");
+        setShowMediaUpload(false);
+        setUploadAltText("");
+        setUploadCaption("");
+        setUploadCredit("");
+        if (fileInputRef.current) fileInputRef.current.value = "";
+      }
+    } catch {
+      setUploadStatus("error");
+      setUploadError(
+        "Image upload or processing failed. Verify the file and rights metadata, then retry.",
+      );
+    }
+  }
+
   async function publication(
     action: "publish" | "unpublish" | "rollback",
     targetRevisionId: string | null = null,
   ) {
-    if (!(await persist())) return;
-    const result = await requestStoryPublication({
-      articleId: draft.articleId,
-      action,
-      targetRevisionId,
-    });
-    setMessage(result.ok ? "Publication request queued." : result.message);
+    setIsPublishing(true);
+    setMessage("");
+
+    // Step 1: Pre-save current draft
+    const saved = await persist();
+    if (!saved && action !== "unpublish") {
+      setIsPublishing(false);
+      setMessageType("error");
+      setMessage("Please resolve the draft conflict or save error before publishing.");
+      return;
+    }
+
+    // Step 2: Client-side preflight check
+    if (action === "publish") {
+      if (!draft.title.trim()) {
+        setIsPublishing(false);
+        setMessageType("error");
+        setMessage("Story title is required for publication.");
+        return;
+      }
+      if (!draft.slug.trim()) {
+        setIsPublishing(false);
+        setMessageType("error");
+        setMessage("Canonical slug is required for publication.");
+        return;
+      }
+      if (!draft.pillarId) {
+        setIsPublishing(false);
+        setMessageType("error");
+        setMessage("An editorial pillar must be selected.");
+        return;
+      }
+      if (draft.coverMediaAssetId) {
+        const cover = reference.media.find((m) => m.id === draft.coverMediaAssetId);
+        if (cover && !cover.default_alt_text?.trim()) {
+          setIsPublishing(false);
+          setMessageType("error");
+          setMessage("Selected cover image must have descriptive alternative text.");
+          return;
+        }
+      }
+    }
+
+    try {
+      const result = await requestStoryPublication({
+        articleId: draft.articleId,
+        action,
+        targetRevisionId,
+      });
+
+      if (!result.ok) {
+        setMessageType("error");
+        setMessage(result.message);
+      } else {
+        setMessageType("success");
+        setMessage(
+          action === "publish"
+            ? "Publication job submitted and worker dispatched. The story will appear publicly momentarily."
+            : action === "unpublish"
+              ? "Story unpublished. Public routes and search projections removed."
+              : "Rollback job submitted.",
+        );
+      }
+    } catch {
+      setMessageType("error");
+      setMessage("Publication request failed. Review the draft and retry.");
+    } finally {
+      setIsPublishing(false);
+    }
   }
 
-  const categories = reference.categories.filter(
-    (category) => category.pillar_id === draft.pillarId,
+  const categories = useMemo(
+    () => reference.categories.filter((category) => category.pillar_id === draft.pillarId),
+    [reference.categories, draft.pillarId],
   );
-  const selectedCover = reference.media.find((asset) => asset.id === draft.coverMediaAssetId);
+
+  const filteredTags = useMemo(
+    () =>
+      reference.tags.filter(
+        (tag) =>
+          !tagQuery ||
+          tag.name.toLowerCase().includes(tagQuery.toLowerCase()) ||
+          tag.slug.toLowerCase().includes(tagQuery.toLowerCase()),
+      ),
+    [reference.tags, tagQuery],
+  );
+
+  const filteredSources = useMemo(
+    () =>
+      reference.sources.filter(
+        (source) =>
+          !sourceQuery ||
+          source.title.toLowerCase().includes(sourceQuery.toLowerCase()) ||
+          (source.author_text &&
+            source.author_text.toLowerCase().includes(sourceQuery.toLowerCase())),
+      ),
+    [reference.sources, sourceQuery],
+  );
+
+  const selectedCover = useMemo(
+    () => reference.media.find((asset) => asset.id === draft.coverMediaAssetId),
+    [reference.media, draft.coverMediaAssetId],
+  );
+
   const previewMarkdown = useMemo(() => {
     const definitions = draft.sourceIds
       .map((sourceId, index) => {
@@ -195,31 +563,98 @@ export function StoryEditor({
         <Link href="/admin/stories">← Stories</Link>
         <div className={`save-state save-state--${status}`}>
           <span />
-          {saveLabel(status)}
+          {saveLabel(status, lastSavedAt)}
         </div>
         <div className="editor-actions">
           <button onClick={() => setPreview((value) => !value)} type="button">
             {preview ? "Hide preview" : "Preview"}
           </button>
+          <button
+            disabled={status === "saving" || Boolean(conflict)}
+            onClick={() => void persist()}
+            title="Save draft (Ctrl+S / Cmd+S)"
+            type="button"
+          >
+            Save Draft
+          </button>
           {story.article.published_revision_id ? (
-            <button onClick={() => void publication("unpublish")} type="button">
+            <button
+              disabled={isPublishing}
+              onClick={() => void publication("unpublish")}
+              type="button"
+            >
               Unpublish
             </button>
           ) : null}
           <button
             className="primary-action"
+            disabled={isPublishing || status === "saving" || Boolean(conflict)}
             onClick={() => void publication("publish")}
             type="button"
           >
-            Publish
+            {isPublishing
+              ? "Publishing…"
+              : story.article.published_revision_id
+                ? "Republish"
+                : "Publish"}
           </button>
         </div>
       </header>
 
       {message ? (
-        <p className="editor-message" role="status">
-          {message}
-        </p>
+        <div className={`editor-message editor-message--${messageType}`} role="status">
+          <span>{message}</span>
+          {status === "error" && !conflict ? (
+            <button className="save-retry-btn" onClick={() => void persist()} type="button">
+              Retry Save
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+
+      {conflict ? (
+        <section className="editor-conflict" aria-label="Draft conflict" role="alert">
+          <div>
+            <strong>Draft conflict requires a decision</strong>
+            <p>
+              Your local changes are preserved, but the server has a newer draft. Choose a safe
+              action before saving or publishing again.
+            </p>
+          </div>
+          {conflict.server ? (
+            <div className="editor-conflict__comparison">
+              <div>
+                <span>Server version {conflict.server.rowVersion}</span>
+                <strong>{conflict.server.title}</strong>
+                <p>{conflict.server.markdown.slice(0, 240)}</p>
+              </div>
+              <div>
+                <span>Your local version based on {conflict.local.rowVersion}</span>
+                <strong>{conflict.local.title}</strong>
+                <p>{conflict.local.markdown.slice(0, 240)}</p>
+              </div>
+            </div>
+          ) : (
+            <p>The current server draft could not be loaded. Refresh this page to reconcile it.</p>
+          )}
+          <p>
+            Reloading discards the local version. Replacing keeps your local fields and overwrites
+            the newer server draft after a fresh row-version check.
+          </p>
+          <div className="editor-conflict__actions">
+            <button disabled={!conflict.server} onClick={reloadServerDraft} type="button">
+              Reload server draft
+            </button>
+            <button
+              className="primary-action"
+              disabled={!conflict.server}
+              onClick={replaceServerWithLocalDraft}
+              type="button"
+            >
+              Replace server with my local draft
+            </button>
+          </div>
+        </section>
       ) : null}
 
       <div className={`editor-grid ${preview ? "editor-grid--preview" : ""}`}>
@@ -235,27 +670,42 @@ export function StoryEditor({
             className="editor-excerpt"
             maxLength={360}
             onChange={(event) => update("excerpt", event.target.value)}
-            placeholder="Excerpt"
+            placeholder="Dek / Excerpt (sub-headline that sets context)"
             rows={2}
             value={draft.excerpt}
           />
           <div className="format-toolbar" aria-label="Markdown formatting">
-            <button onClick={() => format("**", "**", "bold")} type="button">
+            <button onClick={() => format("**", "**", "bold")} title="Bold" type="button">
               <strong>B</strong>
             </button>
-            <button onClick={() => format("_", "_", "italic")} type="button">
+            <button onClick={() => format("_", "_", "italic")} title="Italic" type="button">
               <em>I</em>
             </button>
-            <button onClick={() => format("## ", "", "Heading")} type="button">
+            <button onClick={() => format("## ", "", "Heading")} title="Heading 2" type="button">
               H2
             </button>
-            <button onClick={() => format("[", "](https://)", "link text")} type="button">
+            <button
+              onClick={() => format("### ", "", "Subheading")}
+              title="Heading 3"
+              type="button"
+            >
+              H3
+            </button>
+            <button
+              onClick={() => format("[", "](https://)", "link text")}
+              title="Link"
+              type="button"
+            >
               Link
             </button>
-            <button onClick={() => format("> ", "", "Quote")} type="button">
+            <button onClick={() => format("> ", "", "Quote")} title="Blockquote" type="button">
               Quote
             </button>
-            <button onClick={() => format(":::callout\n", "\n:::", "Note")} type="button">
+            <button
+              onClick={() => format(":::callout\n", "\n:::", "Callout note")}
+              title="Callout Box"
+              type="button"
+            >
               Callout
             </button>
           </div>
@@ -289,8 +739,9 @@ export function StoryEditor({
         ) : null}
 
         <aside className="editor-metadata">
+          {/* Story Settings */}
           <details open>
-            <summary>Story</summary>
+            <summary>Story Architecture</summary>
             <label>
               Slug
               <input onChange={(event) => update("slug", event.target.value)} value={draft.slug} />
@@ -326,10 +777,20 @@ export function StoryEditor({
               </select>
             </label>
           </details>
-          <details>
-            <summary>Tags</summary>
+
+          {/* Tags Panel */}
+          <details open>
+            <summary>Tags ({draft.tagIds.length})</summary>
+            <div className="panel-controls">
+              <input
+                className="panel-search"
+                onChange={(e) => setTagQuery(e.target.value)}
+                placeholder="Search tags…"
+                value={tagQuery}
+              />
+            </div>
             <div className="metadata-checklist">
-              {reference.tags.map((tag) => (
+              {filteredTags.map((tag) => (
                 <label key={tag.id}>
                   <input
                     checked={draft.tagIds.includes(tag.id)}
@@ -343,20 +804,134 @@ export function StoryEditor({
                     }
                     type="checkbox"
                   />
-                  {tag.name}
+                  <span>{tag.name}</span>
                 </label>
               ))}
+              {!filteredTags.length ? (
+                <p className="field-hint">No existing tags match &apos;{tagQuery}&apos;</p>
+              ) : null}
             </div>
+
+            {/* Inline Tag Creator */}
+            <form className="inline-creator" onSubmit={handleCreateTag}>
+              <input
+                disabled={isCreatingTag}
+                onChange={(e) => setNewTagName(e.target.value)}
+                placeholder="Create new tag…"
+                value={newTagName}
+              />
+              <button disabled={isCreatingTag || !newTagName.trim()} type="submit">
+                {isCreatingTag ? "Adding…" : "+ Add"}
+              </button>
+            </form>
           </details>
-          <details>
-            <summary>Cover image</summary>
+
+          {/* Cover Image Panel */}
+          <details open>
+            <summary>Cover Image {selectedCover ? "✓" : ""}</summary>
+            {selectedCover ? (
+              <div className="selected-cover-card">
+                {selectedCover.publicUrl ? (
+                  <img alt={selectedCover.default_alt_text ?? ""} src={selectedCover.publicUrl} />
+                ) : null}
+                <div className="cover-card-info">
+                  <strong>{selectedCover.original_filename}</strong>
+                  <p>{selectedCover.default_alt_text || "No alt text"}</p>
+                  <button onClick={() => update("coverMediaAssetId", null)} type="button">
+                    Remove Cover
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <p className="field-hint">No cover image selected.</p>
+            )}
+
+            <div className="panel-actions-row">
+              <button onClick={() => setShowMediaUpload((v) => !v)} type="button">
+                {showMediaUpload ? "Close Upload" : "+ Upload New Image"}
+              </button>
+            </div>
+
+            {showMediaUpload ? (
+              <form className="inline-upload-form" onSubmit={handleMediaUpload}>
+                <h4>Upload Cover Image</h4>
+                <label>
+                  File
+                  <input
+                    accept="image/jpeg,image/png,image/webp,image/avif"
+                    ref={fileInputRef}
+                    required
+                    type="file"
+                  />
+                </label>
+                <label>
+                  Alt Text (Required for publication)
+                  <input
+                    onChange={(e) => setUploadAltText(e.target.value)}
+                    placeholder="Descriptive text for accessibility"
+                    required
+                    value={uploadAltText}
+                  />
+                </label>
+                <label>
+                  Caption
+                  <input
+                    onChange={(e) => setUploadCaption(e.target.value)}
+                    placeholder="Photo caption"
+                    value={uploadCaption}
+                  />
+                </label>
+                <label>
+                  Credit
+                  <input
+                    onChange={(e) => setUploadCredit(e.target.value)}
+                    placeholder="Photo credit / source"
+                    value={uploadCredit}
+                  />
+                </label>
+                <label>
+                  Rights Status
+                  <select onChange={(e) => setUploadRights(e.target.value)} value={uploadRights}>
+                    <option value="owned">Owned</option>
+                    <option value="licensed">Licensed</option>
+                    <option value="public_domain">Public domain</option>
+                    <option value="creative_commons">Creative Commons</option>
+                    <option value="permission_granted">Permission granted</option>
+                  </select>
+                </label>
+
+                {uploadError ? <p className="upload-error">{uploadError}</p> : null}
+
+                <button
+                  className="primary-action"
+                  disabled={
+                    uploadStatus === "hashing" ||
+                    uploadStatus === "uploading" ||
+                    uploadStatus === "processing"
+                  }
+                  type="submit"
+                >
+                  {uploadStatus === "idle"
+                    ? "Upload & Set as Cover"
+                    : uploadStatus === "hashing"
+                      ? "Hashing image…"
+                      : uploadStatus === "uploading"
+                        ? "Uploading original…"
+                        : uploadStatus === "processing"
+                          ? "Generating derivatives…"
+                          : "Upload & Set"}
+                </button>
+              </form>
+            ) : null}
+
+            <h4 className="sub-heading">Choose from Media Library</h4>
             <div className="media-picker">
               <button
                 className={!draft.coverMediaAssetId ? "is-selected" : ""}
                 onClick={() => update("coverMediaAssetId", null)}
                 type="button"
               >
-                No cover
+                None
               </button>
               {reference.media.map((asset) => (
                 <button
@@ -372,8 +947,10 @@ export function StoryEditor({
                 </button>
               ))}
             </div>
+
             {selectedCover?.publicUrl ? (
               <button
+                className="insert-inline-btn"
                 onClick={() =>
                   insertAtCursor(
                     `\n![${selectedCover.default_alt_text ?? ""}](${selectedCover.publicUrl} "${selectedCover.default_caption ?? ""}")\n`,
@@ -381,14 +958,102 @@ export function StoryEditor({
                 }
                 type="button"
               >
-                Insert cover inline
+                Insert cover image inline in text
               </button>
             ) : null}
           </details>
-          <details>
-            <summary>Sources</summary>
+
+          {/* Sources Panel */}
+          <details open>
+            <summary>Sources & Citations ({draft.sourceIds.length})</summary>
+            <div className="panel-controls">
+              <input
+                className="panel-search"
+                onChange={(e) => setSourceQuery(e.target.value)}
+                placeholder="Search sources…"
+                value={sourceQuery}
+              />
+              <button onClick={() => setShowAddSource((v) => !v)} type="button">
+                {showAddSource ? "Cancel" : "+ Add Source"}
+              </button>
+            </div>
+
+            {showAddSource ? (
+              <form className="inline-source-form" onSubmit={(e) => handleCreateSource(e, true)}>
+                <h4>Add Research Source</h4>
+                <label>
+                  Type
+                  <select
+                    onChange={(e) => setNewSourceType(e.target.value as SourceType)}
+                    value={newSourceType}
+                  >
+                    <option value="website">Website</option>
+                    <option value="book">Book</option>
+                    <option value="journal_article">Journal article</option>
+                    <option value="news_article">News article</option>
+                    <option value="report">Report</option>
+                    <option value="archive">Archive</option>
+                    <option value="interview">Interview</option>
+                    <option value="dataset">Dataset</option>
+                    <option value="video">Video</option>
+                    <option value="other">Other</option>
+                  </select>
+                </label>
+                <label>
+                  Title (Required)
+                  <input
+                    onChange={(e) => setNewSourceTitle(e.target.value)}
+                    placeholder="Document or article title"
+                    required
+                    value={newSourceTitle}
+                  />
+                </label>
+                <label>
+                  Author / Organization
+                  <input
+                    onChange={(e) => setNewSourceAuthor(e.target.value)}
+                    placeholder="e.g. John Doe / Nature"
+                    value={newSourceAuthor}
+                  />
+                </label>
+                <label>
+                  Publisher
+                  <input
+                    onChange={(e) => setNewSourcePublisher(e.target.value)}
+                    placeholder="e.g. Oxford University Press"
+                    value={newSourcePublisher}
+                  />
+                </label>
+                <label>
+                  URL
+                  <input
+                    onChange={(e) => setNewSourceUrl(e.target.value)}
+                    placeholder="https://..."
+                    type="url"
+                    value={newSourceUrl}
+                  />
+                </label>
+                <div className="source-form-actions">
+                  <button
+                    className="primary-action"
+                    disabled={isCreatingSource || !newSourceTitle.trim()}
+                    type="submit"
+                  >
+                    {isCreatingSource ? "Adding…" : "Add & Cite at Cursor"}
+                  </button>
+                  <button
+                    disabled={isCreatingSource || !newSourceTitle.trim()}
+                    onClick={(e) => handleCreateSource(e, false)}
+                    type="button"
+                  >
+                    Add to Story
+                  </button>
+                </div>
+              </form>
+            ) : null}
+
             <div className="metadata-checklist">
-              {reference.sources.map((source) => (
+              {filteredSources.map((source) => (
                 <label key={source.id}>
                   <input
                     checked={draft.sourceIds.includes(source.id)}
@@ -403,8 +1068,11 @@ export function StoryEditor({
                     type="checkbox"
                   />
                   <span>
-                    {source.title}
+                    <span className="source-title-text" title={source.title}>
+                      {source.title}
+                    </span>
                     <button
+                      className="cite-btn"
                       onClick={(event) => {
                         event.preventDefault();
                         const selectedIndex = draft.sourceIds.indexOf(source.id);
@@ -415,6 +1083,7 @@ export function StoryEditor({
                         }
                         insertAtCursor(`[^src-${citationIndex + 1}]`);
                       }}
+                      title="Insert footnote citation tag at cursor"
                       type="button"
                     >
                       Cite
@@ -422,31 +1091,40 @@ export function StoryEditor({
                   </span>
                 </label>
               ))}
+              {!filteredSources.length ? (
+                <p className="field-hint">No sources match &apos;{sourceQuery}&apos;</p>
+              ) : null}
             </div>
           </details>
+
+          {/* SEO Metadata */}
           <details>
-            <summary>SEO</summary>
+            <summary>SEO & Social Metadata</summary>
             <label>
-              SEO title
+              SEO Title
               <input
                 maxLength={120}
                 onChange={(event) => update("seoTitle", event.target.value)}
+                placeholder={draft.title}
                 value={draft.seoTitle}
               />
             </label>
             <label>
-              SEO description
+              SEO Description
               <textarea
                 maxLength={320}
                 onChange={(event) => update("seoDescription", event.target.value)}
+                placeholder={draft.excerpt || "Meta description for search indexing…"}
                 rows={4}
                 value={draft.seoDescription}
               />
             </label>
-            <p className="field-hint">Canonical: {story.article.canonical_path}</p>
+            <p className="field-hint">Canonical Path: {story.article.canonical_path}</p>
           </details>
+
+          {/* Version History */}
           <details>
-            <summary>History</summary>
+            <summary>Revision History ({story.revisions.length})</summary>
             <ol className="revision-list">
               {story.revisions.map((item) => (
                 <li key={item.id}>
@@ -456,8 +1134,12 @@ export function StoryEditor({
                   <time>{new Date(item.created_at).toLocaleString("en-IN")}</time>
                   {story.article.published_revision_id &&
                   item.id !== story.article.published_revision_id ? (
-                    <button onClick={() => void publication("rollback", item.id)} type="button">
-                      Rollback
+                    <button
+                      disabled={isPublishing}
+                      onClick={() => void publication("rollback", item.id)}
+                      type="button"
+                    >
+                      Rollback to this version
                     </button>
                   ) : null}
                 </li>

@@ -1,6 +1,6 @@
 # Subtext Media
 
-Premium, research-driven documentary publishing. -*Everything has a subtext*.
+Premium, research-driven documentary publishing. -_Everything has a subtext_.
 
 ## Repository
 
@@ -84,7 +84,7 @@ The rollback SQL in `supabase/rollbacks` is destructive and intended for migrati
 
 ## Authentication contract
 
-Google OAuth is the only identity path. Signed Supabase Auth hooks enforce exact-email admission and issue the `user_role=admin` RLS claim only to the configured founder. Next.js Proxy performs early session refresh/rejection; protected layouts, APIs, server actions, and privileged-client gateways repeat authorization on the server.
+GitHub OAuth is the only identity path. Signed Supabase Auth hooks enforce exact-email admission and issue the `user_role=admin` RLS claim only to the configured founder. Next.js Proxy performs early session refresh/rejection; protected layouts, APIs, server actions, and privileged-client gateways repeat authorization on the server.
 
 - `npm run auth:validate` — application authorization and PostgreSQL RLS integration tests
 - `npm run auth:check:functions` — Deno type-check for both signed Auth hook functions
@@ -111,7 +111,7 @@ See `docs/launch/README.md` for current blockers and sign-off requirements.
 
 - [x] M1 — Monorepo and application foundation
 - [x] M2 — Database schema, RLS, Storage policy, generated types, and synchronized documentation
-- [x] M3 — Google authentication, exact-email admission, protected routes/APIs/actions, and RLS integration
+- [x] M3 — GitHub authentication, exact-email admission, protected routes/APIs/actions, and RLS integration
 - [x] M4 — Writer Workspace, canonical Markdown editor, autosave, media, sources, preview, and publication requests
 - [x] M5 — Durable publishing worker, atomic projection, retries, revalidation, search, sitemap, RSS, and verification
 - [x] M6 — Public editorial website, pillar archives, long-form reading, search, SEO, media, sitemap, and RSS

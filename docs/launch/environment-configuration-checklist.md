@@ -14,6 +14,7 @@ Generated from `scripts/launch/environment-contract.mjs`. Secret values must nev
 | admin | `NEXT_PUBLIC_ADMIN_URL` | Vercel Admin | https-url | Required |
 | admin | `NEXT_PUBLIC_SUPABASE_URL` | Vercel Admin | https-url | Required |
 | admin | `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | Vercel Admin | publishable-key | Required |
+| admin | `SUPABASE_SECRET_KEY` | Vercel Admin | secret-key | Required |
 | admin | `FOUNDER_EMAIL` | Vercel Admin | email | Required |
 | admin | `PUBLISHING_WORKER_SECRET` | Vercel Admin | secret | Required |
 | supabase-functions | `SUPABASE_URL` | Supabase Edge Functions | https-url | Platform-provided; verify |
@@ -26,8 +27,8 @@ Generated from `scripts/launch/environment-contract.mjs`. Secret values must nev
 | supabase-functions | `REVALIDATION_SECRET` | Supabase Edge Functions | secret | Required |
 | operator | `SUPABASE_PROJECT_REF` | Operator/CI only | project-ref | Required |
 | operator | `SUPABASE_ACCESS_TOKEN` | Operator/CI only | secret | Required |
-| operator | `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` | Operator/CI only | google-client | Required |
-| operator | `SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET` | Operator/CI only | secret | Required |
+| operator | `SUPABASE_AUTH_EXTERNAL_GITHUB_CLIENT_ID` | Operator/CI only | github-client | Required |
+| operator | `SUPABASE_AUTH_EXTERNAL_GITHUB_SECRET` | Operator/CI only | secret | Required |
 | operator | `BEFORE_USER_CREATED_HOOK_SECRET` | Operator/CI only | webhook-secret | Required |
 | operator | `CUSTOM_ACCESS_TOKEN_HOOK_SECRET` | Operator/CI only | webhook-secret | Required |
 | operator | `NEXT_PUBLIC_ADMIN_URL` | Operator/CI only | https-url | Required |
@@ -43,7 +44,7 @@ Generated from `scripts/launch/environment-contract.mjs`. Secret values must nev
 ## Non-environment configuration
 
 - Supabase production project region, migrations, RLS, Storage buckets and Edge Functions deployed.
-- Google OAuth production client authorizes only the Supabase callback URI.
+- GitHub OAuth production client authorizes only the Supabase callback URI.
 - Vercel Public root is `apps/public`; Admin root is `apps/admin`.
 - Cloudflare is authoritative DNS. Vercel records remain DNS-only unless double-proxy behavior is tested.
 - Preserve existing MX/TXT mail records when changing nameservers.

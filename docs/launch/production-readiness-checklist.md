@@ -16,9 +16,9 @@
 ## Identity and secrets
 
 - [ ] Run `npm run launch:env -- --target=all` in a secure environment.
-- [ ] Configure Google OAuth callback URIs.
+- [ ] Configure GitHub OAuth callback URIs.
 - [ ] Apply Supabase Auth configuration using the committed script.
-- [ ] Verify wrong Google identity is rejected before account creation.
+- [ ] Verify wrong GitHub identity is rejected before account creation.
 - [ ] Verify founder receives `user_role=admin` and RLS access.
 - [ ] Confirm all secrets are distinct and server-only.
 - [ ] Run browser bundle credential scan on deployed build artifacts.

@@ -52,7 +52,7 @@ ${rows.join("\n")}
 ## Non-environment configuration
 
 - Supabase production project region, migrations, RLS, Storage buckets and Edge Functions deployed.
-- Google OAuth production client authorizes only the Supabase callback URI.
+- GitHub OAuth production client authorizes only the Supabase callback URI.
 - Vercel Public root is \`apps/public\`; Admin root is \`apps/admin\`.
 - Cloudflare is authoritative DNS. Vercel records remain DNS-only unless double-proxy behavior is tested.
 - Preserve existing MX/TXT mail records when changing nameservers.
