@@ -6,14 +6,14 @@ Milestone 3 establishes the security boundary for the private, single-founder Ad
 
 ## Authentication architecture
 
-Subtext uses only Google OAuth through Supabase Auth. Google proves identity; Subtext separately decides whether that verified identity is the one configured founder.
+Subtext uses only GitHub OAuth through Supabase Auth. GitHub proves identity; Subtext separately decides whether that verified identity is the one configured founder.
 
 Security is enforced at independent layers:
 
-1. **Admission:** a signed Supabase Before User Created HTTP hook rejects every new identity except the exact founder Google email.
-2. **Token authorization:** a signed Custom Access Token hook adds `user_role=admin` only to the exact founder Google identity. Every other token receives `user_role=null`.
+1. **Admission:** a signed Supabase Before User Created HTTP hook rejects every new identity except the exact founder GitHub email.
+2. **Token authorization:** a signed Custom Access Token hook adds `user_role=admin` only to the exact founder GitHub identity. Every other token receives `user_role=null`.
 3. **Session verification:** Next.js Proxy calls `getClaims()` to verify/refresh the request token. Protected pages then call both `getClaims()` and `getUser()` before returning data.
-4. **Application authorization:** the fresh Auth user, verified claims, Google provider, confirmed email, exact server-only founder email, subject ID, anonymous flag, and admin claim must all agree.
+4. **Application authorization:** the fresh Auth user, verified claims, GitHub provider, confirmed email, exact server-only founder email, subject ID, anonymous flag, and admin claim must all agree.
 5. **Route/API/action authorization:** `/admin`, `/admin/*`, `/api/*`, and privileged server actions call the shared server guard. Proxy is only an early rejection layer.
 6. **Database authorization:** the request-scoped Supabase client carries the signed JWT. M2 RLS permits editorial mutations only when `private.is_admin()` sees `user_role=admin`.
 7. **Privileged-client authorization:** the RLS-bypassing secret client can only be created through `withAuthorizedAdminClient`, after the complete server guard succeeds.
@@ -21,8 +21,8 @@ Security is enforced at independent layers:
 ## Authentication flow
 
 1. The visitor opens `admin.subtext.media/login`.
-2. The server action starts Supabase Google OAuth with PKCE and an exact callback URL.
-3. Google authenticates the selected account and returns to Supabase Auth.
+2. The server action starts Supabase GitHub OAuth with PKCE and an exact callback URL.
+3. GitHub authenticates the selected account and returns to Supabase Auth.
 4. Before account creation, Supabase invokes the signed admission hook. Wrong email or provider is rejected.
 5. Before token issuance, Supabase invokes the signed token hook. Only the founder receives `user_role=admin`.
 6. Supabase returns an authorization code to `/auth/callback`.
@@ -44,7 +44,7 @@ The application authorizes only when all conditions hold:
 - token subject equals the verified user ID;
 - user and claim email exactly match normalized server-only `FOUNDER_EMAIL`;
 - email is confirmed;
-- the sole provider is Google;
+- the sole provider is GitHub;
 - user/session is not anonymous;
 - the signed token has `user_role=admin`.
 
@@ -89,7 +89,7 @@ The following remain server/deployment only:
 
 - `FOUNDER_EMAIL`
 - `SUPABASE_SECRET_KEY`
-- Google OAuth client secret
+- GitHub OAuth client secret
 - Auth hook signing secrets
 - Supabase management access token
 - database credentials
@@ -117,7 +117,7 @@ Both HTTP hooks disable JWT verification because they execute before a user JWT 
 | No cookie/session                                 | Page redirects to Login; API returns 401                                          |
 | Expired or invalid JWT                            | `getClaims()` fails; protected request is rejected                                |
 | Revoked/deleted Auth user                         | fresh `getUser()` fails; protected request is rejected                            |
-| Valid unauthorized Google session                 | Access Denied; API/action returns 403; RLS rejects mutations                      |
+| Valid unauthorized GitHub session                 | Access Denied; API/action returns 403; RLS rejects mutations                      |
 | Wrong OAuth provider                              | admission hook rejects creation; existing session lacks admin claim and is denied |
 | Matching email without admin claim                | denied; this detects missing/misconfigured token hook                             |
 | Forged client admin flag                          | ignored; no server or database decision reads it                                  |
@@ -133,7 +133,7 @@ Logout is deliberately available from both the protected workspace and Access De
 
 ## Local and production setup
 
-See [google-oauth-setup.md](./google-oauth-setup.md).
+See [github-oauth-setup.md](./github-oauth-setup.md).
 
 ## Security tests
 

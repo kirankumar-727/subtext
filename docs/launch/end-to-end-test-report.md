@@ -4,13 +4,13 @@
 
 **Production E2E: NOT EXECUTED — blocked by deployment and domain configuration.**
 
-The automated PostgreSQL and application suites validate the same lifecycle primitives, but they are not a substitute for a real Google-authenticated browser session, deployed Edge Function, production CDN, DNS or real media transfer.
+The automated PostgreSQL and application suites validate the same lifecycle primitives, but they are not a substitute for a real GitHub-authenticated browser session, deployed Edge Function, production CDN, DNS or real media transfer.
 
 ## Required validation story
 
 Use `launch-validation-story.md` as the staging content pack. Enter every field through the real Writer Workspace:
 
-1. Founder Google login.
+1. Founder GitHub login.
 2. New Story.
 3. Title, excerpt, History pillar and Archaeology category.
 4. Canonical Markdown including quote, table, footnote and `:::subtext`.

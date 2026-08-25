@@ -9,14 +9,15 @@ const repositoryRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url))
 const targetDirectory = path.join(repositoryRoot, "docs/authentication");
 
 const mermaid = `flowchart TD
-  Founder[Founder] --> Google[Google OAuth]
-  Google --> Supabase[Supabase Auth]
+  Founder[Founder] --> GitHub[GitHub OAuth]
+  GitHub --> Supabase[Supabase Auth]
   Supabase --> Admission{Signed exact-email admission hook}
   Admission -->|Rejected| Denied[Access Denied]
   Admission -->|Admitted| TokenHook[Signed custom access-token hook]
-  TokenHook --> Session[Authenticated session]
-  Session --> ServerCheck[Server-side founder authorization]
-  ServerCheck --> Decision{Authorization decision}
+  TokenHook --> RoleClaim[user_role=admin claim]
+  RoleClaim --> Session[Authenticated session]
+  Session --> RequireAdmin[requireAdmin()]
+  RequireAdmin --> Decision{Authorization decision}
   Decision -->|Unauthorized| Denied
   Decision -->|Authorized| Admin[Protected Admin Workspace]
   Admin --> RLS[RLS-protected PostgreSQL]
@@ -28,21 +29,22 @@ const dot = `digraph AuthenticationFlow {
   edge [color="#7b7569", fontname="Arial", fontsize="9", arrowsize="0.75"];
 
   Founder [label="Founder"];
-  Google [label="Google OAuth"];
+  GitHub [label="GitHub OAuth"];
   Supabase [label="Supabase Auth"];
   Admission [label="Signed exact-email\nadmission hook", shape="diamond", fillcolor="#efe8d8"];
   TokenHook [label="Signed custom\naccess-token hook"];
+  RoleClaim [label="user_role=admin\nclaim"];
   Session [label="Authenticated session"];
-  ServerCheck [label="Server-side founder authorization"];
+  RequireAdmin [label="requireAdmin()"];
   Decision [label="Authorization decision", shape="diamond", fillcolor="#efe8d8"];
   Admin [label="Protected Admin Workspace", fillcolor="#e3eadf"];
   RLS [label="RLS-protected PostgreSQL", shape="cylinder", fillcolor="#e3eadf"];
   Denied [label="Access Denied", fillcolor="#f1ded9"];
 
-  Founder -> Google -> Supabase -> Admission;
+  Founder -> GitHub -> Supabase -> Admission;
   Admission -> Denied [label="rejected"];
   Admission -> TokenHook [label="admitted"];
-  TokenHook -> Session -> ServerCheck -> Decision;
+  TokenHook -> RoleClaim -> Session -> RequireAdmin -> Decision;
   Decision -> Denied [label="unauthorized"];
   Decision -> Admin [label="authorized"];
   Admin -> RLS;

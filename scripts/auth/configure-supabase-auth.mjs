@@ -24,9 +24,10 @@ const configuration = {
   external_email_enabled: false,
   external_phone_enabled: false,
   external_anonymous_users_enabled: false,
-  external_google_enabled: true,
-  external_google_client_id: required("SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID"),
-  external_google_secret: required("SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET"),
+  external_google_enabled: false,
+  external_github_enabled: true,
+  external_github_client_id: required("SUPABASE_AUTH_EXTERNAL_GITHUB_CLIENT_ID"),
+  external_github_secret: required("SUPABASE_AUTH_EXTERNAL_GITHUB_SECRET"),
   hook_before_user_created_enabled: true,
   hook_before_user_created_uri: new URL(
     "/functions/v1/before-user-created",
@@ -62,4 +63,4 @@ if (!response.ok) {
   throw new Error(`Supabase Auth configuration failed (${response.status}): ${detail}`);
 }
 
-process.stdout.write("Supabase Google provider and signed Auth hooks configured successfully.\n");
+process.stdout.write("Supabase GitHub provider and signed Auth hooks configured successfully.\n");

@@ -11,10 +11,10 @@
 - [x] Browser bundle credential scanner passes locally.
 - [x] Public/Admin CSP, no-sniff, referrer and frame controls configured.
 - [x] Admin is disallowed from indexing; public internal APIs are disallowed in robots.
-- [ ] Production founder Google login succeeds.
-- [ ] Production unauthorized Google login is rejected.
+- [ ] Production founder GitHub login succeeds.
+- [ ] Production unauthorized GitHub login is rejected.
 - [ ] Production Auth hooks and session revocation verified.
 - [ ] Production Storage policies tested using public, unauthorized and founder contexts.
 - [ ] Deployed bundles scanned with actual secret sentinels.
 - [ ] Cloudflare/Vercel TLS and headers inspected.
-- [ ] Supabase organization recovery, Google recovery codes and session revocation rehearsed.
+- [ ] Supabase organization recovery, GitHub recovery codes and session revocation rehearsed.
