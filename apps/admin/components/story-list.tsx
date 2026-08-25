@@ -13,13 +13,15 @@ type Story = {
 export function StoryList({
   stories,
   pillars,
+  initialStatus = "",
 }: {
   stories: Story[];
   pillars: { name: string; slug: string }[];
+  initialStatus?: string;
 }) {
   const [query, setQuery] = useState("");
   const [pillar, setPillar] = useState("");
-  const [status, setStatus] = useState("");
+  const [status, setStatus] = useState(initialStatus);
   const [sort, setSort] = useState("newest");
   const filtered = useMemo(
     () =>
