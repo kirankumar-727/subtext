@@ -1,6 +1,6 @@
 # Known Limitations at Launch
 
-- Production deployment and real Google OAuth have not been executed from this workspace.
+- Production deployment and real GitHub OAuth have not been executed from this workspace.
 - `subtext.media` currently serves an unrelated Shopify storefront; DNS/ownership must be resolved before cutover.
 - `admin.subtext.media` currently has no resolvable DNS record.
 - Free-tier availability has no production SLA; Supabase may pause low-activity projects.

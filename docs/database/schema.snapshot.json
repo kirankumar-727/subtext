@@ -1,5 +1,5 @@
 {
-  "fingerprint": "9e6802df88faa003b6798fa0db1b61ce35db2b2f6597c02c9c036ae6b960967f",
+  "fingerprint": "33159f0aacbf038f1aca92e9b0de356123938f5e2e143b5a48ab074b71c1cf98",
   "migrations": [
     "20260808000100_extensions_and_enums.sql",
     "20260808000200_taxonomy_and_authors.sql",
@@ -10,7 +10,8 @@
     "20260808000700_row_level_security_and_grants.sql",
     "20260808000800_storage_buckets_and_policies.sql",
     "20260808001000_cms_atomic_commands.sql",
-    "20260808001100_publishing_worker_commands.sql"
+    "20260808001100_publishing_worker_commands.sql",
+    "20260824000100_step2b_live_schema_reconciliation.sql"
   ],
   "schema": {
     "tables": [
