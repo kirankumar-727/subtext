@@ -17,13 +17,13 @@ export async function getWorkspaceReferenceData() {
     supabase.from("tags").select("id,name,slug").eq("is_active", true).order("name"),
     supabase
       .from("sources")
-      .select("id,title,author_text,source_type,url")
+      .select("id,title,author_text,publisher,source_type,url,archive_url,isbn,doi")
       .order("updated_at", { ascending: false })
       .limit(200),
     supabase
       .from("media_assets")
       .select(
-        "id,original_filename,default_alt_text,default_caption,credit_text,processing_status,created_at",
+        "id,kind,original_filename,mime_type,byte_size,width,height,default_alt_text,default_caption,credit_text,rights_status,processing_status,created_at",
       )
       .eq("processing_status", "ready")
       .order("created_at", { ascending: false })
@@ -63,8 +63,8 @@ export async function getWorkspaceReferenceData() {
       return {
         ...asset,
         publicUrl,
-        width: variant?.width ?? null,
-        height: variant?.height ?? null,
+        width: variant?.width ?? asset.width,
+        height: variant?.height ?? asset.height,
       };
     }),
   };

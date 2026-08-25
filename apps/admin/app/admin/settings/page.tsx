@@ -1,34 +1,24 @@
-import { updateSiteSettings } from "@/app/admin/cms-actions";
+import { SettingsForm } from "@/components/settings-form";
 import { getSiteSettings } from "@/lib/cms/queries";
+
 export default async function SettingsPage() {
   const settings = await getSiteSettings();
+  const publicationName = String(settings["brand.name"] ?? "Subtext Media");
+  const tagline = String(settings["brand.tagline"] ?? "Everything has a subtext.");
+
   return (
-    <main className="workspace-page workspace-page--narrow">
+    <main className="workspace-page workspace-page--settings">
       <header className="workspace-page__header">
         <div>
-          <p className="workspace-eyebrow">Publication</p>
+          <p className="workspace-eyebrow">Publication identity</p>
           <h1>Settings</h1>
+          <p className="workspace-page__lede">
+            Set the small, public-facing details that make Subtext feel like a publication rather
+            than a product shell.
+          </p>
         </div>
       </header>
-      <form action={updateSiteSettings} className="management-form">
-        <label>
-          Publication name
-          <input
-            defaultValue={String(settings["brand.name"] ?? "Subtext Media")}
-            name="brandName"
-          />
-        </label>
-        <label>
-          Tagline
-          <input
-            defaultValue={String(settings["brand.tagline"] ?? "Everything has a subtext.")}
-            name="tagline"
-          />
-        </label>
-        <button className="primary-action" type="submit">
-          Save settings
-        </button>
-      </form>
+      <SettingsForm initialName={publicationName} initialTagline={tagline} />
     </main>
   );
 }
