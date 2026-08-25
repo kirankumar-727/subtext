@@ -3,6 +3,12 @@ import "server-only";
 import { createSupabaseServerClient } from "@subtext/supabase/server";
 
 import { requireAdmin } from "@/lib/auth/authorization";
+import type {
+  PublicationJobStatus,
+  SettingsControlCenterData,
+  SettingsPublicationEvent,
+  SettingsPublicationJob,
+} from "@/lib/cms/types";
 
 export async function getWorkspaceReferenceData() {
   await requireAdmin();
@@ -195,13 +201,212 @@ export async function listSources() {
 export type WorkspaceReferenceData = Awaited<ReturnType<typeof getWorkspaceReferenceData>>;
 export type StoryData = NonNullable<Awaited<ReturnType<typeof getStory>>>;
 
+const supportedSiteSettingKeys = ["brand.name", "brand.tagline"] as const;
+const publicationJobStatuses: PublicationJobStatus[] = [
+  "queued",
+  "processing",
+  "committed",
+  "verifying",
+  "succeeded",
+  "failed",
+  "dead_letter",
+  "cancelled",
+];
+const publicationFailureStatuses: PublicationJobStatus[] = ["failed", "dead_letter"];
+
+type SiteSettingRow = {
+  key: string;
+  value: unknown;
+  updated_at: string;
+};
+
+function settingText(value: unknown, fallback: string) {
+  return typeof value === "string" && value.trim() ? value : fallback;
+}
+
+function mapSettingsPublicationJob(row: {
+  action: SettingsPublicationJob["action"];
+  status: SettingsPublicationJob["status"];
+  attempt_count: number;
+  max_attempts: number;
+  error_code: string | null;
+  created_at: string;
+  updated_at: string;
+  completed_at: string | null;
+}): SettingsPublicationJob {
+  return {
+    action: row.action,
+    status: row.status,
+    attemptCount: row.attempt_count,
+    maxAttempts: row.max_attempts,
+    errorCode: row.error_code,
+    createdAt: row.created_at,
+    updatedAt: row.updated_at,
+    completedAt: row.completed_at,
+  };
+}
+
+function mapSettingsPublicationEvent(row: {
+  level: SettingsPublicationEvent["level"];
+  step: string;
+  message: string;
+  occurred_at: string;
+}): SettingsPublicationEvent {
+  return {
+    level: row.level,
+    step: row.step,
+    message: row.message,
+    occurredAt: row.occurred_at,
+  };
+}
+
 export async function getSiteSettings() {
   await requireAdmin();
   const supabase = await createSupabaseServerClient();
   const { data, error } = await supabase
     .from("site_settings")
     .select("key,value,description,updated_at")
-    .in("key", ["brand.name", "brand.tagline"]);
+    .in("key", [...supportedSiteSettingKeys]);
   if (error) throw new Error("Settings could not be loaded");
   return Object.fromEntries((data ?? []).map((setting) => [setting.key, setting.value]));
+}
+
+export async function getSettingsControlCenterData(): Promise<SettingsControlCenterData> {
+  await requireAdmin();
+  const supabase = await createSupabaseServerClient();
+  const [
+    settingsResult,
+    publicationCountResults,
+    latestJobResult,
+    latestSuccessfulResult,
+    latestFailedResult,
+    latestEventResult,
+    mediaCountResults,
+  ] = await Promise.all([
+    supabase
+      .from("site_settings")
+      .select("key,value,updated_at")
+      .in("key", [...supportedSiteSettingKeys]),
+    Promise.all(
+      publicationJobStatuses.map((status) =>
+        supabase
+          .from("publication_jobs")
+          .select("id", { count: "exact", head: true })
+          .eq("status", status),
+      ),
+    ),
+    supabase
+      .from("publication_jobs")
+      .select(
+        "action,status,attempt_count,max_attempts,error_code,created_at,updated_at,completed_at",
+      )
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("publication_jobs")
+      .select(
+        "action,status,attempt_count,max_attempts,error_code,created_at,updated_at,completed_at",
+      )
+      .eq("status", "succeeded")
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("publication_jobs")
+      .select(
+        "action,status,attempt_count,max_attempts,error_code,created_at,updated_at,completed_at",
+      )
+      .in("status", publicationFailureStatuses)
+      .order("updated_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    supabase
+      .from("publication_events")
+      .select("level,step,message,occurred_at")
+      .order("occurred_at", { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    Promise.all([
+      supabase.from("media_assets").select("id", { count: "exact", head: true }),
+      supabase
+        .from("media_assets")
+        .select("id", { count: "exact", head: true })
+        .eq("processing_status", "ready"),
+      supabase
+        .from("media_assets")
+        .select("id", { count: "exact", head: true })
+        .eq("processing_status", "failed"),
+      supabase
+        .from("media_assets")
+        .select("id", { count: "exact", head: true })
+        .in("rights_status", ["unknown", "restricted"]),
+      supabase
+        .from("media_variants")
+        .select("id", { count: "exact", head: true })
+        .eq("is_public", true),
+    ]),
+  ]);
+
+  if (settingsResult.error) throw new Error("Settings could not be loaded");
+
+  const settings = new Map(
+    (settingsResult.data as SiteSettingRow[] | null | undefined)?.map((setting) => [
+      setting.key,
+      setting,
+    ]) ?? [],
+  );
+  const nameSetting = settings.get("brand.name");
+  const taglineSetting = settings.get("brand.tagline");
+  const settingDates = [nameSetting?.updated_at, taglineSetting?.updated_at].filter(
+    (value): value is string => Boolean(value),
+  );
+
+  const publicationResults = [
+    ...publicationCountResults,
+    latestJobResult,
+    latestSuccessfulResult,
+    latestFailedResult,
+    latestEventResult,
+  ];
+  const publicationAvailable = publicationResults.every((result) => !result.error);
+  const counts = publicationAvailable
+    ? Object.fromEntries(
+        publicationJobStatuses.map((status, index) => [
+          status,
+          publicationCountResults[index]?.count ?? 0,
+        ]),
+      )
+    : {};
+  const mediaAvailable = mediaCountResults.every((result) => !result.error);
+
+  return {
+    publication: {
+      name: settingText(nameSetting?.value, "Subtext Media"),
+      tagline: settingText(taglineSetting?.value, "Everything has a subtext."),
+      updatedAt: settingDates.sort().at(-1) ?? null,
+    },
+    publishing: {
+      available: publicationAvailable,
+      counts,
+      latestJob: latestJobResult.data ? mapSettingsPublicationJob(latestJobResult.data) : null,
+      latestSuccessfulJob: latestSuccessfulResult.data
+        ? mapSettingsPublicationJob(latestSuccessfulResult.data)
+        : null,
+      latestFailedJob: latestFailedResult.data
+        ? mapSettingsPublicationJob(latestFailedResult.data)
+        : null,
+      latestEvent: latestEventResult.data
+        ? mapSettingsPublicationEvent(latestEventResult.data)
+        : null,
+    },
+    media: {
+      available: mediaAvailable,
+      totalAssets: mediaCountResults[0]?.count ?? null,
+      readyAssets: mediaCountResults[1]?.count ?? null,
+      failedAssets: mediaCountResults[2]?.count ?? null,
+      assetsRequiringRightsReview: mediaCountResults[3]?.count ?? null,
+      publicVariants: mediaCountResults[4]?.count ?? null,
+    },
+  };
 }

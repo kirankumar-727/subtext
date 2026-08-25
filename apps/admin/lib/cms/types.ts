@@ -27,6 +27,57 @@ export type StoryDraftResult = {
 
 export type SourceType = Database["public"]["Enums"]["source_type"];
 export type MediaProcessingStatus = Database["public"]["Enums"]["media_processing_status"];
+export type PublicationAction = Database["public"]["Enums"]["publication_action"];
+export type PublicationEventLevel = Database["public"]["Enums"]["publication_event_level"];
+export type PublicationJobStatus = Database["public"]["Enums"]["publication_job_status"];
+
+export type SettingsPublicationJob = {
+  action: PublicationAction;
+  status: PublicationJobStatus;
+  attemptCount: number;
+  maxAttempts: number;
+  errorCode: string | null;
+  createdAt: string;
+  updatedAt: string;
+  completedAt: string | null;
+};
+
+export type SettingsPublicationEvent = {
+  level: PublicationEventLevel;
+  step: string;
+  message: string;
+  occurredAt: string;
+};
+
+export type SettingsControlCenterData = {
+  publication: {
+    name: string;
+    tagline: string;
+    updatedAt: string | null;
+  };
+  publishing: {
+    available: boolean;
+    counts: Partial<Record<PublicationJobStatus, number>>;
+    latestJob: SettingsPublicationJob | null;
+    latestSuccessfulJob: SettingsPublicationJob | null;
+    latestFailedJob: SettingsPublicationJob | null;
+    latestEvent: SettingsPublicationEvent | null;
+  };
+  media: {
+    available: boolean;
+    totalAssets: number | null;
+    readyAssets: number | null;
+    failedAssets: number | null;
+    assetsRequiringRightsReview: number | null;
+    publicVariants: number | null;
+  };
+};
+
+export type SettingsEnvironment = {
+  environment: "development" | "preview" | "production";
+  appVersion: string;
+  siteOrigin: string | null;
+};
 
 export type TagItem = {
   id: string;

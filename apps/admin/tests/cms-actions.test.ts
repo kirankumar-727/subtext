@@ -31,6 +31,7 @@ import {
   finalizeMediaUpload,
   requestStoryPublication,
   saveStoryDraft,
+  updateSiteSettings,
 } from "@/app/admin/cms-actions";
 import { rebaseDraftOntoServer } from "@/lib/cms/autosave";
 
@@ -282,6 +283,54 @@ describe("CMS action authorization and deduplication", () => {
 
     expect(result).toEqual({ ok: true, source: existing });
     expect(call).toBe(2);
+  });
+});
+
+describe("site settings persistence", () => {
+  beforeEach(() => {
+    requireAdminMock.mockReset().mockResolvedValue({ userId: "founder-id" });
+    createSupabaseServerClientMock.mockReset();
+    revalidatePathMock.mockReset();
+  });
+
+  it("upserts only the supported public publication identity settings", async () => {
+    const upsert = vi.fn().mockResolvedValue({ error: null });
+    createSupabaseServerClientMock.mockResolvedValue({
+      from: (table: string) => {
+        if (table !== "site_settings") throw new Error(`Unexpected table: ${table}`);
+        return { upsert };
+      },
+    });
+    const formData = new FormData();
+    formData.set("brandName", "  Subtext Journal  ");
+    formData.set("tagline", "  Everything has a subtext.  ");
+
+    await updateSiteSettings(formData);
+
+    expect(upsert).toHaveBeenCalledWith([
+      expect.objectContaining({
+        key: "brand.name",
+        value: "Subtext Journal",
+        is_public: true,
+        updated_by: "founder-id",
+      }),
+      expect.objectContaining({
+        key: "brand.tagline",
+        value: "Everything has a subtext.",
+        is_public: true,
+        updated_by: "founder-id",
+      }),
+    ]);
+    expect(revalidatePathMock).toHaveBeenCalledWith("/admin/settings");
+  });
+
+  it("validates publication identity before opening a Supabase client", async () => {
+    const formData = new FormData();
+    formData.set("brandName", "   ");
+    formData.set("tagline", "A tagline");
+
+    await expect(updateSiteSettings(formData)).rejects.toThrow();
+    expect(createSupabaseServerClientMock).not.toHaveBeenCalled();
   });
 });
 
