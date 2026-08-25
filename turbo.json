@@ -7,6 +7,14 @@
     "NEXT_PUBLIC_SUPABASE_URL",
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY"
   ],
+  "globalPassThroughEnv": [
+    "SUPABASE_SECRET_KEY",
+    "FOUNDER_EMAIL",
+    "PUBLISHING_SIGNING_SECRET",
+    "PUBLISHING_WORKER_SECRET",
+    "REVALIDATION_SECRET",
+    "CRON_SECRET"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
