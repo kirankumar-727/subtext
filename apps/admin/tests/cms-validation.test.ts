@@ -11,8 +11,21 @@ import {
   serializeDraftContent,
   shouldRecoverLocalDraft,
 } from "@/lib/cms/autosave";
-import type { StoryDraftInput } from "@/lib/cms/types";
-import { sourceSchema, storyDraftSchema, tagInputSchema } from "@/lib/cms/validation";
+import type { StoryMediaReadiness, StoryDraftInput } from "@/lib/cms/types";
+import {
+  buildPublicationReadiness,
+  type PublicationReadinessInput,
+} from "@/lib/cms/publication-readiness";
+import {
+  createCategorySchema,
+  createPillarSchema,
+  sourceSchema,
+  storyDraftSchema,
+  tagInputSchema,
+  updateCategorySchema,
+  updatePillarSchema,
+  updateTagSchema,
+} from "@/lib/cms/validation";
 
 const draft: StoryDraftInput = {
   articleId: "90000000-0000-4000-8000-000000000001",
@@ -116,5 +129,115 @@ describe("writer draft validation and recovery", () => {
   it("uses a write-conscious debounce", () => {
     expect(AUTOSAVE_DELAY_MS).toBeGreaterThanOrEqual(1000);
     expect(AUTOSAVE_DELAY_MS).toBeLessThanOrEqual(3000);
+  });
+});
+
+describe("publication readiness guidance", () => {
+  const media: StoryMediaReadiness = {
+    mediaAssetId: "90000000-0000-4000-8000-000000000010",
+    role: "hero",
+    placementAltText: "A restored archive",
+    kind: "image",
+    processingStatus: "ready",
+    rightsStatus: "owned",
+    defaultAltText: "An archive",
+    hasPublicVariant: true,
+  };
+
+  const readyInput: PublicationReadinessInput = {
+    revisionMatchesArticle: true,
+    title: "A considered story",
+    slug: "a-considered-story",
+    markdown: "# A considered story\n\nBody.",
+    pillarId: "90000000-0000-4000-8000-000000000011",
+    categoryId: "90000000-0000-4000-8000-000000000012",
+    categoryPillarId: "90000000-0000-4000-8000-000000000011",
+    categoryIsKnown: true,
+    seoTitle: "A considered story",
+    seoDescription: "A useful description.",
+    selectedSourceCount: 1,
+    publicCitationCount: 1,
+    media: [media],
+    mediaStatusUnavailable: false,
+  };
+
+  it("keeps warnings visible without treating them as blocking", () => {
+    const result = buildPublicationReadiness({
+      ...readyInput,
+      selectedSourceCount: 0,
+      publicCitationCount: 0,
+      seoDescription: "",
+    });
+
+    expect(result.isReady).toBe(true);
+    expect(result.blockingChecks).toHaveLength(0);
+    expect(result.warningChecks.map((check) => check.code)).toEqual([
+      "citations_missing",
+      "seo_description_missing",
+    ]);
+  });
+
+  it("explains pending media without changing draft-save behavior", () => {
+    const result = buildPublicationReadiness({
+      ...readyInput,
+      media: [{ ...media, processingStatus: "pending" }],
+    });
+    const mediaCheck = result.checks.find((check) => check.code === "media_not_ready");
+
+    expect(result.isReady).toBe(false);
+    expect(result.blockingChecks.map((check) => check.code)).toContain("media_not_ready");
+    expect(mediaCheck?.message).toContain("Draft saves remain available");
+  });
+
+  it("surfaces the existing category relationship condition", () => {
+    const result = buildPublicationReadiness({
+      ...readyInput,
+      categoryPillarId: "90000000-0000-4000-8000-000000000099",
+    });
+
+    expect(result.blockingChecks.map((check) => check.code)).toContain("category_pillar_mismatch");
+  });
+
+  it("does not call a draft without an attached revision ready", () => {
+    const result = buildPublicationReadiness({
+      ...readyInput,
+      revisionMatchesArticle: false,
+    });
+
+    expect(result.isReady).toBe(false);
+    expect(result.blockingChecks.map((check) => check.code)).toContain("revision_mismatch");
+  });
+});
+
+describe("editorial structure validation", () => {
+  const id = "90000000-0000-4000-8000-000000000020";
+
+  it("bounds the safe taxonomy mutation fields", () => {
+    expect(createPillarSchema.parse({ name: "History", sortOrder: 2 })).toMatchObject({
+      name: "History",
+      sortOrder: 2,
+    });
+    expect(
+      createCategorySchema.parse({ pillarId: id, name: "Archives", sortOrder: 1 }),
+    ).toMatchObject({
+      pillarId: id,
+      name: "Archives",
+    });
+    expect(updatePillarSchema.parse({ id, description: "Context", sortOrder: 0 })).toMatchObject({
+      id,
+      description: "Context",
+    });
+    expect(updateCategorySchema.parse({ id, description: "Context", sortOrder: 0 })).toMatchObject({
+      id,
+    });
+    expect(updateTagSchema.parse({ id, description: "Context" })).toMatchObject({ id });
+  });
+
+  it("rejects invalid IDs and negative editorial order", () => {
+    expect(() =>
+      createCategorySchema.parse({ pillarId: "not-a-uuid", name: "Archives" }),
+    ).toThrow();
+    expect(() => createPillarSchema.parse({ name: "History", sortOrder: -1 })).toThrow();
+    expect(() => updateTagSchema.parse({ id: "not-a-uuid", description: "Context" })).toThrow();
   });
 });

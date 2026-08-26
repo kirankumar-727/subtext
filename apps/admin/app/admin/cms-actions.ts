@@ -14,11 +14,16 @@ import { isSupportedImageUpload, mediaUploadRequestSchema, safeFilename } from "
 import type { MediaItem, SourceItem, SourceType, StoryDraftInput, TagItem } from "@/lib/cms/types";
 import { dispatchPublishingWorker } from "@/lib/publishing/dispatch";
 import {
+  createCategorySchema,
+  createPillarSchema,
   createStorySchema,
   initialSlug,
   sourceSchema,
   storyDraftSchema,
   tagInputSchema,
+  updateCategorySchema,
+  updatePillarSchema,
+  updateTagSchema,
 } from "@/lib/cms/validation";
 
 async function readCurrentDraftForConflict(
@@ -242,7 +247,178 @@ export async function createTag(input: { name: string; description?: string | un
   }
 
   revalidatePath("/admin/stories");
+  revalidatePath("/admin/tags");
   return { ok: true as const, tag: data as TagItem };
+}
+
+function editorialMutationMessage(error: { code?: string } | null, fallback: string) {
+  if (error?.code === "23505") return "That name or slug is already in use.";
+  if (error?.code === "23503") return "The selected editorial relationship no longer exists.";
+  if (error?.code === "23514")
+    return "The editorial record does not satisfy the existing database rules.";
+  return fallback;
+}
+
+export async function createPillar(input: {
+  name: string;
+  description?: string | undefined;
+  sortOrder?: number | undefined;
+}) {
+  await requireAdmin();
+  const parsed = createPillarSchema.parse({
+    name: input.name,
+    description: input.description,
+    sortOrder: input.sortOrder ?? 0,
+  });
+  const slug = slugify(parsed.name);
+  if (!slug) throw new Error("Invalid pillar name");
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("pillars")
+    .insert({
+      name: parsed.name,
+      slug,
+      description: parsed.description || null,
+      sort_order: parsed.sortOrder,
+      is_active: true,
+    })
+    .select("id,name,slug,description,sort_order,is_active,created_at,updated_at")
+    .single();
+  if (error || !data) {
+    return {
+      ok: false as const,
+      message: editorialMutationMessage(error, "Pillar could not be created."),
+    };
+  }
+  revalidatePath("/admin/pillars");
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/stories");
+  return { ok: true as const, pillar: data };
+}
+
+export async function updatePillar(input: {
+  id: string;
+  description?: string | undefined;
+  sortOrder?: number | undefined;
+}) {
+  await requireAdmin();
+  const parsed = updatePillarSchema.parse({
+    id: input.id,
+    description: input.description,
+    sortOrder: input.sortOrder ?? 0,
+  });
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("pillars")
+    .update({
+      description: parsed.description || null,
+      sort_order: parsed.sortOrder,
+    })
+    .eq("id", parsed.id)
+    .select("id,name,slug,description,sort_order,is_active,created_at,updated_at")
+    .single();
+  if (error || !data) {
+    return {
+      ok: false as const,
+      message: editorialMutationMessage(error, "Pillar could not be updated."),
+    };
+  }
+  revalidatePath("/admin/pillars");
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/stories");
+  return { ok: true as const, pillar: data };
+}
+
+export async function createCategory(input: {
+  pillarId: string;
+  name: string;
+  description?: string | undefined;
+  sortOrder?: number | undefined;
+}) {
+  await requireAdmin();
+  const parsed = createCategorySchema.parse({
+    pillarId: input.pillarId,
+    name: input.name,
+    description: input.description,
+    sortOrder: input.sortOrder ?? 0,
+  });
+  const slug = slugify(parsed.name);
+  if (!slug) throw new Error("Invalid category name");
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("categories")
+    .insert({
+      pillar_id: parsed.pillarId,
+      name: parsed.name,
+      slug,
+      description: parsed.description || null,
+      sort_order: parsed.sortOrder,
+      is_active: true,
+    })
+    .select("id,pillar_id,name,slug,description,sort_order,is_active,created_at,updated_at")
+    .single();
+  if (error || !data) {
+    return {
+      ok: false as const,
+      message: editorialMutationMessage(error, "Category could not be created."),
+    };
+  }
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/stories");
+  return { ok: true as const, category: data };
+}
+
+export async function updateCategory(input: {
+  id: string;
+  description?: string | undefined;
+  sortOrder?: number | undefined;
+}) {
+  await requireAdmin();
+  const parsed = updateCategorySchema.parse({
+    id: input.id,
+    description: input.description,
+    sortOrder: input.sortOrder ?? 0,
+  });
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("categories")
+    .update({
+      description: parsed.description || null,
+      sort_order: parsed.sortOrder,
+    })
+    .eq("id", parsed.id)
+    .select("id,pillar_id,name,slug,description,sort_order,is_active,created_at,updated_at")
+    .single();
+  if (error || !data) {
+    return {
+      ok: false as const,
+      message: editorialMutationMessage(error, "Category could not be updated."),
+    };
+  }
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/stories");
+  return { ok: true as const, category: data };
+}
+
+export async function updateTag(input: { id: string; description?: string | undefined }) {
+  await requireAdmin();
+  const parsed = updateTagSchema.parse(input);
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("tags")
+    .update({ description: parsed.description || null })
+    .eq("id", parsed.id)
+    .select("id,name,slug,description,is_active,created_at,updated_at")
+    .single();
+  if (error || !data) {
+    return {
+      ok: false as const,
+      message: editorialMutationMessage(error, "Tag could not be updated."),
+    };
+  }
+  revalidatePath("/admin/tags");
+  revalidatePath("/admin/stories");
+  return { ok: true as const, tag: data };
 }
 
 export async function createSourceInline(input: {
@@ -492,6 +668,7 @@ export async function finalizeMediaUpload(
         processing_status: "ready",
         created_at: asset.created_at,
         publicUrl,
+        hasPublicVariant: Boolean(representativeKey),
         width: representativeWidth,
         height: representativeHeight,
       },

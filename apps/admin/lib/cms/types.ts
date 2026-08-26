@@ -110,6 +110,81 @@ export type MediaItem = {
   processing_status: MediaProcessingStatus;
   created_at: string;
   publicUrl: string | null;
+  hasPublicVariant: boolean;
   width: number | null;
   height: number | null;
+};
+
+export type EditorialPillar = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EditorialCategory = {
+  id: string;
+  pillar_id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  sort_order: number;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+};
+
+export type EditorialTag = {
+  id: string;
+  name: string;
+  slug: string;
+  description: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  usageCount: number | null;
+};
+
+export type EditorialAuthor = {
+  id: string;
+  name: string;
+  slug: string;
+  bio_markdown: string | null;
+  bio_plain_text: string | null;
+  website_url: string | null;
+  avatar_media_asset_id: string | null;
+  is_active: boolean;
+  created_at: string;
+  updated_at: string;
+  storyCount: number | null;
+};
+
+export type EditorialStructureData = {
+  pillars: EditorialPillar[];
+  categories: EditorialCategory[];
+  tags: EditorialTag[];
+  authors: EditorialAuthor[];
+};
+
+export type StoryMediaReadiness = {
+  mediaAssetId: string;
+  role: Database["public"]["Enums"]["media_role"];
+  placementAltText: string | null;
+  kind: Database["public"]["Enums"]["media_kind"];
+  processingStatus: MediaProcessingStatus;
+  rightsStatus: Database["public"]["Enums"]["media_rights_status"];
+  defaultAltText: string | null;
+  hasPublicVariant: boolean;
+};
+
+export type StoryPublicationReadinessData = {
+  revisionId: string | null;
+  categoryPillarId: string | null;
+  categoryIsKnown: boolean;
+  media: StoryMediaReadiness[];
+  publicCitationCount: number;
 };

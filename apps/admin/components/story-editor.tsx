@@ -21,6 +21,7 @@ import {
   shouldRecoverLocalDraft,
 } from "@/lib/cms/autosave";
 import { SOURCE_TYPE_OPTIONS } from "@/lib/cms/source-types";
+import { PublicationReadinessPanel } from "@/components/publication-readiness-panel";
 import type { StoryData, WorkspaceReferenceData } from "@/lib/cms/queries";
 import type {
   MediaItem,
@@ -953,6 +954,12 @@ export function StoryEditor({
               <p className="inspector-readonly-note">
                 Publication status and timing are controlled by the existing publishing workflow.
               </p>
+              <PublicationReadinessPanel
+                draft={draft}
+                reference={reference}
+                saveState={status}
+                story={story}
+              />
               {/* Story Settings */}
               <details open>
                 <summary>Document details</summary>
@@ -1166,19 +1173,29 @@ export function StoryEditor({
                   >
                     None
                   </button>
-                  {reference.media.map((asset) => (
-                    <button
-                      className={draft.coverMediaAssetId === asset.id ? "is-selected" : ""}
-                      key={asset.id}
-                      onClick={() => update("coverMediaAssetId", asset.id)}
-                      type="button"
-                    >
-                      {asset.publicUrl ? (
-                        <img alt={asset.default_alt_text ?? ""} src={asset.publicUrl} />
-                      ) : null}
-                      <span>{asset.original_filename}</span>
-                    </button>
-                  ))}
+                  {reference.media.map((asset) => {
+                    const isSelectable = asset.processing_status === "ready";
+                    return (
+                      <button
+                        className={`${draft.coverMediaAssetId === asset.id ? "is-selected" : ""}${!isSelectable ? " is-unavailable" : ""}`}
+                        disabled={!isSelectable}
+                        key={asset.id}
+                        onClick={() => update("coverMediaAssetId", asset.id)}
+                        title={
+                          isSelectable
+                            ? asset.original_filename
+                            : `${asset.original_filename} is ${asset.processing_status}; wait until it is ready`
+                        }
+                        type="button"
+                      >
+                        {asset.publicUrl ? (
+                          <img alt={asset.default_alt_text ?? ""} src={asset.publicUrl} />
+                        ) : null}
+                        <span>{asset.original_filename}</span>
+                        {!isSelectable ? <small>{asset.processing_status}</small> : null}
+                      </button>
+                    );
+                  })}
                 </div>
 
                 {selectedCover?.publicUrl ? (

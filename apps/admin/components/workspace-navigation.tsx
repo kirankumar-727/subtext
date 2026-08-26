@@ -56,6 +56,13 @@ const navigationItems: NavigationItem[] = [
   { href: "/admin/settings", icon: "settings", label: "Settings" },
 ];
 
+const editorialItems: NavigationItem[] = [
+  { href: "/admin/pillars", icon: "stories", label: "Pillars" },
+  { href: "/admin/categories", icon: "stories", label: "Categories" },
+  { href: "/admin/tags", icon: "stories", label: "Tags" },
+  { href: "/admin/authors", icon: "profile", label: "Authors" },
+];
+
 const workflowItems = [
   {
     href: "/admin/stories?status=draft" as Route,
@@ -379,6 +386,25 @@ export function WorkspaceNavigation({ children, counts, logout }: WorkspaceNavig
         <nav aria-label="Writer workspace destinations" className="workspace-sidebar__nav">
           <span className="workspace-sidebar__section-label">Workspace</span>
           {navigationItems.map((item) => {
+            const active = isCurrentNavigationItem(pathname, item.href);
+            return (
+              <Link
+                aria-current={active ? "page" : undefined}
+                className="workspace-nav-link"
+                href={item.href}
+                key={item.href}
+                onClick={closeDrawer}
+                title={item.label}
+              >
+                <NavigationIcon name={item.icon} />
+                <span className="workspace-nav-label">{item.label}</span>
+              </Link>
+            );
+          })}
+
+          <span className="workspace-sidebar__rule" />
+          <span className="workspace-sidebar__section-label">Editorial</span>
+          {editorialItems.map((item) => {
             const active = isCurrentNavigationItem(pathname, item.href);
             return (
               <Link

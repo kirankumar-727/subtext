@@ -51,7 +51,7 @@ export function MediaLibrary({ media }: MediaLibraryProps) {
           <span className="workspace-section-kicker">Publication assets</span>
           <p>
             {media.length
-              ? `${media.length} ready asset${media.length === 1 ? "" : "s"}`
+              ? `${media.length} asset${media.length === 1 ? "" : "s"} in the library`
               : "A considered home for publication imagery"}
           </p>
         </div>

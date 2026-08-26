@@ -24,7 +24,9 @@ vi.mock("next/server", () => ({ after: afterMock }));
 vi.mock("sharp", () => ({ default: sharpMock }));
 
 import {
+  createCategory,
   createMediaUploadIntent,
+  createPillar,
   createSourceInline,
   createStory,
   createTag,
@@ -225,6 +227,16 @@ describe("CMS action authorization and deduplication", () => {
     requireAdminMock.mockRejectedValue(new Error("not authorized"));
 
     await expect(createTag({ name: "Restricted" })).rejects.toThrow("not authorized");
+    expect(createSupabaseServerClientMock).not.toHaveBeenCalled();
+  });
+
+  it("keeps pillar and category creation behind the same admin guard", async () => {
+    requireAdminMock.mockRejectedValue(new Error("not authorized"));
+
+    await expect(createPillar({ name: "Restricted pillar" })).rejects.toThrow("not authorized");
+    await expect(
+      createCategory({ name: "Restricted category", pillarId: "pillar-id" }),
+    ).rejects.toThrow("not authorized");
     expect(createSupabaseServerClientMock).not.toHaveBeenCalled();
   });
 

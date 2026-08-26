@@ -4,10 +4,15 @@ import { createSupabaseServerClient } from "@subtext/supabase/server";
 
 import { requireAdmin } from "@/lib/auth/authorization";
 import type {
+  EditorialAuthor,
+  EditorialCategory,
+  EditorialPillar,
+  EditorialTag,
   PublicationJobStatus,
   SettingsControlCenterData,
   SettingsPublicationEvent,
   SettingsPublicationJob,
+  StoryMediaReadiness,
 } from "@/lib/cms/types";
 
 export async function getWorkspaceReferenceData() {
@@ -31,7 +36,6 @@ export async function getWorkspaceReferenceData() {
       .select(
         "id,kind,original_filename,mime_type,byte_size,width,height,default_alt_text,default_caption,credit_text,rights_status,processing_status,created_at",
       )
-      .eq("processing_status", "ready")
       .order("created_at", { ascending: false })
       .limit(100),
   ]);
@@ -69,10 +73,90 @@ export async function getWorkspaceReferenceData() {
       return {
         ...asset,
         publicUrl,
+        hasPublicVariant: Boolean(variant),
         width: variant?.width ?? asset.width,
         height: variant?.height ?? asset.height,
       };
     }),
+  };
+}
+
+export async function getEditorialStructureData() {
+  await requireAdmin();
+  const supabase = await createSupabaseServerClient();
+  const [pillarsResult, categoriesResult, tagsResult, authorsResult] = await Promise.all([
+    supabase
+      .from("pillars")
+      .select("id,name,slug,description,sort_order,is_active,created_at,updated_at")
+      .order("sort_order")
+      .order("name"),
+    supabase
+      .from("categories")
+      .select("id,pillar_id,name,slug,description,sort_order,is_active,created_at,updated_at")
+      .order("pillar_id")
+      .order("sort_order")
+      .order("name"),
+    supabase
+      .from("tags")
+      .select("id,name,slug,description,is_active,created_at,updated_at")
+      .order("name"),
+    supabase
+      .from("authors")
+      .select(
+        "id,name,slug,bio_markdown,bio_plain_text,website_url,avatar_media_asset_id,is_active,created_at,updated_at",
+      )
+      .order("name"),
+  ]);
+
+  if (pillarsResult.error || categoriesResult.error || tagsResult.error || authorsResult.error) {
+    throw new Error("Editorial structure could not be loaded");
+  }
+
+  const tags = tagsResult.data ?? [];
+  const authors = authorsResult.data ?? [];
+  const [tagUsageResults, authorStoryResults] = await Promise.all([
+    Promise.all(
+      tags.map((tag) =>
+        supabase
+          .from("article_tags")
+          .select("tag_id", { count: "exact", head: true })
+          .eq("tag_id", tag.id),
+      ),
+    ),
+    Promise.all(
+      authors.map((author) =>
+        supabase
+          .from("articles")
+          .select("id", { count: "exact", head: true })
+          .eq("author_id", author.id),
+      ),
+    ),
+  ]);
+
+  const tagUsage = new Map(
+    tags.map((tag, index) => [
+      tag.id,
+      tagUsageResults[index]?.error ? null : (tagUsageResults[index]?.count ?? 0),
+    ]),
+  );
+  const authorStoryCounts = new Map(
+    authors.map((author, index) => [
+      author.id,
+      authorStoryResults[index]?.error ? null : (authorStoryResults[index]?.count ?? 0),
+    ]),
+  );
+
+  return {
+    pillars: (pillarsResult.data ?? []) as EditorialPillar[],
+    categories: (categoriesResult.data ?? []) as EditorialCategory[],
+    tags: tags.map((tag): EditorialTag => ({
+      ...tag,
+      usageCount: tagUsage.get(tag.id) ?? null,
+    })),
+    authors: authors.map((author): EditorialAuthor => ({
+      ...author,
+      storyCount: authorStoryCounts.get(author.id) ?? null,
+    })),
   };
 }
 
@@ -161,28 +245,92 @@ export async function getStory(articleId: string) {
   ]);
   if (revision.error || articleTags.error || revisions.error || jobs.error)
     throw new Error("Story could not be loaded");
-  const citations = article.current_draft_revision_id
+  const [citations, mediaPlacements] = await Promise.all([
+    article.current_draft_revision_id
+      ? supabase
+          .from("citations")
+          .select("source_id,ordinal,citation_key,is_public")
+          .eq("revision_id", article.current_draft_revision_id)
+          .order("ordinal")
+      : Promise.resolve({ data: [], error: null }),
+    article.current_draft_revision_id
+      ? supabase
+          .from("article_media")
+          .select("media_asset_id,role,alt_text")
+          .eq("revision_id", article.current_draft_revision_id)
+          .order("role")
+          .order("position")
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (citations.error || mediaPlacements.error)
+    throw new Error("Story relationships could not be loaded");
+
+  const mediaAssetIds = [...new Set((mediaPlacements.data ?? []).map((row) => row.media_asset_id))];
+  const [mediaAssets, mediaVariants] = await Promise.all([
+    mediaAssetIds.length
+      ? supabase
+          .from("media_assets")
+          .select("id,kind,processing_status,rights_status,default_alt_text")
+          .in("id", mediaAssetIds)
+      : Promise.resolve({ data: [], error: null }),
+    mediaAssetIds.length
+      ? supabase
+          .from("media_variants")
+          .select("media_asset_id")
+          .in("media_asset_id", mediaAssetIds)
+          .eq("is_public", true)
+      : Promise.resolve({ data: [], error: null }),
+  ]);
+  if (mediaAssets.error || mediaVariants.error)
+    throw new Error("Story media readiness could not be loaded");
+
+  const categoryResult = article.category_id
     ? await supabase
-        .from("citations")
-        .select("source_id,ordinal,citation_key")
-        .eq("revision_id", article.current_draft_revision_id)
-        .order("ordinal")
-    : { data: [], error: null };
-  const hero = article.current_draft_revision_id
-    ? await supabase
-        .from("article_media")
-        .select("media_asset_id")
-        .eq("revision_id", article.current_draft_revision_id)
-        .eq("role", "hero")
+        .from("categories")
+        .select("id,pillar_id")
+        .eq("id", article.category_id)
         .maybeSingle()
     : { data: null, error: null };
-  if (citations.error || hero.error) throw new Error("Story relationships could not be loaded");
+  if (categoryResult.error) throw new Error("Story taxonomy readiness could not be loaded");
+
+  const mediaById = new Map((mediaAssets.data ?? []).map((asset) => [asset.id, asset]));
+  const publicVariantIds = new Set(
+    (mediaVariants.data ?? []).map((variant) => variant.media_asset_id),
+  );
+  const readinessMedia = (mediaPlacements.data ?? []).flatMap(
+    (placement): StoryMediaReadiness[] => {
+      const asset = mediaById.get(placement.media_asset_id);
+      if (!asset) return [];
+      return [
+        {
+          mediaAssetId: placement.media_asset_id,
+          role: placement.role,
+          placementAltText: placement.alt_text,
+          kind: asset.kind,
+          processingStatus: asset.processing_status,
+          rightsStatus: asset.rights_status,
+          defaultAltText: asset.default_alt_text,
+          hasPublicVariant: publicVariantIds.has(placement.media_asset_id),
+        },
+      ];
+    },
+  );
+
   return {
     article,
     revision: revision.data,
     tagIds: (articleTags.data ?? []).map((row) => row.tag_id),
     sourceIds: (citations.data ?? []).map((row) => row.source_id),
-    coverMediaAssetId: hero.data?.media_asset_id ?? null,
+    coverMediaAssetId:
+      (mediaPlacements.data ?? []).find((placement) => placement.role === "hero")?.media_asset_id ??
+      null,
+    readiness: {
+      revisionId: article.current_draft_revision_id,
+      categoryPillarId: categoryResult.data?.pillar_id ?? null,
+      categoryIsKnown: !article.category_id || Boolean(categoryResult.data),
+      media: readinessMedia,
+      publicCitationCount: (citations.data ?? []).filter((citation) => citation.is_public).length,
+    },
     revisions: revisions.data ?? [],
     jobs: jobs.data ?? [],
   };
