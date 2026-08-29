@@ -18,7 +18,7 @@
 ## Auth compromise
 
 - Revoke all Supabase sessions.
-- Secure/recover the founder Google account and rotate Google OAuth secret.
+- Secure/recover the founder GitHub account and rotate GitHub OAuth secret.
 - Rotate hook, worker, revalidation, Cron, Supabase and Vercel secrets independently.
 - Verify unauthorized users never received the admin claim or RLS access.
 

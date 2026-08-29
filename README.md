@@ -1,6 +1,6 @@
 # Subtext Media
 
-Premium, research-driven documentary publishing. -*Everything has a subtext*.
+Premium, research-driven documentary publishing. -_Everything has a subtext_.
 
 ## Repository
 
@@ -49,6 +49,10 @@ The root `.env.example` documents every planned variable. Public variables use t
 `NEXT_PUBLIC_` prefix. `SUPABASE_SECRET_KEY`, founder admission data, signing keys, and
 cron/revalidation secrets are server-only and must never enter a browser bundle.
 
+Launch validation requires `SUBTEXT_ENVIRONMENT` to be explicitly set to `production` or
+`staging`; it fails closed when the mode is absent or invalid. The mode selects origin
+policy only and does not replace any required target variable.
+
 ## Vercel projects
 
 Create two projects from the same GitHub repository:
@@ -84,13 +88,13 @@ The rollback SQL in `supabase/rollbacks` is destructive and intended for migrati
 
 ## Authentication contract
 
-Google OAuth is the only identity path. Signed Supabase Auth hooks enforce exact-email admission and issue the `user_role=admin` RLS claim only to the configured founder. Next.js Proxy performs early session refresh/rejection; protected layouts, APIs, server actions, and privileged-client gateways repeat authorization on the server.
+GitHub OAuth is the only identity path. Signed Supabase Auth hooks enforce exact-email admission and issue the `user_role=admin` RLS claim only to the configured founder. Next.js Proxy performs early session refresh/rejection; protected layouts, APIs, server actions, and privileged-client gateways repeat authorization on the server.
 
 - `npm run auth:validate` — application authorization and PostgreSQL RLS integration tests
 - `npm run auth:check:functions` — Deno type-check for both signed Auth hook functions
 - `npm run auth:test:functions` — Standard Webhooks signature and founder-policy tests
 - `npm run auth:generate` — regenerate the authentication flow diagram
-- `npm run auth:configure` — validate production Auth configuration; append `-- --apply` to update Supabase through its Management API
+- `npm run auth:configure` — validate Auth configuration for the selected environment; append `-- --apply` only from an approved secure operator environment
 - `npm run auth:verify-source` — enforce API/action/privileged-client source boundaries
 - `npm run auth:verify-bundles` — verify browser bundles contain no privileged credentials or server configuration
 
@@ -98,8 +102,8 @@ See `docs/authentication/` for setup, session lifecycle, failure handling, RLS i
 
 ## Launch validation
 
-- `npm run launch:env:test` — fail-closed environment contract tests
-- `npm run launch:env -- --target=<public|admin|supabase-functions|operator|all>` — validate private production configuration without printing values
+- `npm run launch:env:test` — fail-closed production/staging environment contract tests
+- `SUBTEXT_ENVIRONMENT=production|staging npm run launch:env -- --target=<public|admin|supabase-functions|operator|all>` — validate the selected private environment without printing values
 - `npm run launch:domain-audit` — inspect DNS/origin routing without credentials
 - `npm run launch:production` — black-box deployed article/search/sitemap/RSS/SEO validation
 - `npm run launch:build-audit` — public JavaScript/CSS/client-component budget
@@ -111,7 +115,7 @@ See `docs/launch/README.md` for current blockers and sign-off requirements.
 
 - [x] M1 — Monorepo and application foundation
 - [x] M2 — Database schema, RLS, Storage policy, generated types, and synchronized documentation
-- [x] M3 — Google authentication, exact-email admission, protected routes/APIs/actions, and RLS integration
+- [x] M3 — GitHub authentication, exact-email admission, protected routes/APIs/actions, and RLS integration
 - [x] M4 — Writer Workspace, canonical Markdown editor, autosave, media, sources, preview, and publication requests
 - [x] M5 — Durable publishing worker, atomic projection, retries, revalidation, search, sitemap, RSS, and verification
 - [x] M6 — Public editorial website, pillar archives, long-form reading, search, SEO, media, sitemap, and RSS

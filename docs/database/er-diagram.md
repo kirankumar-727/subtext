@@ -1,7 +1,7 @@
 # Subtext Media Entity Relationship Diagram
 
 **Generated artifact — do not edit by hand.**  
-Schema fingerprint: `fc96bd943f0b5676a236244ca4507499f7219a6ebaae21151aa841eb8d3f2552`
+Schema fingerprint: `c80dde0a163d14942e3692475d71f48a5a4ee63c81f1d6a069cb06c357d643cc`
 
 The diagram includes all Subtext-owned base tables, primary/foreign/unique key markers, relationship labels, and inferred cardinality. Supabase-managed Storage tables are external platform dependencies and are represented in the dependency graph rather than duplicated here.
 

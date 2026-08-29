@@ -217,7 +217,7 @@ web3 = 30
 # secret = ""
 
 [auth.email]
-# Password/email registration is never exposed; Google OAuth is configured in M3.
+# Password/email registration is never exposed; GitHub OAuth is configured in M3.
 enable_signup = false
 # If enabled, a user will be required to confirm any email change on both the old, and new email
 # addresses. If disabled, only the new email is required to confirm.
@@ -320,20 +320,14 @@ max_frequency = "5s"
 # Use an external OAuth provider. The full list of providers are: `apple`, `azure`, `bitbucket`,
 # `discord`, `facebook`, `github`, `gitlab`, `google`, `keycloak`, `linkedin_oidc`, `notion`, `twitch`,
 # `twitter`, `x`, `slack`, `spotify`, `workos`, `zoom`.
-[auth.external.google]
-enabled = false
-client_id = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID)"
-secret = "env(SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET)"
+[auth.external.github]
+enabled = true
+client_id = "env(SUPABASE_AUTH_EXTERNAL_GITHUB_CLIENT_ID)"
+secret = "env(SUPABASE_AUTH_EXTERNAL_GITHUB_SECRET)"
 redirect_uri = "http://127.0.0.1:54321/auth/v1/callback"
 url = ""
 skip_nonce_check = false
 email_optional = false
-
-[auth.external.github]
-enabled = true
-client_id = "env(SUPABASE_AUTH_GITHUB_CLIENT_ID)"
-secret = "env(SUPABASE_AUTH_GITHUB_SECRET)"
-redirect_uri = "http://127.0.0.1:54321/auth/v1/callback"
 
 [auth.external.apple]
 enabled = false
@@ -345,7 +339,7 @@ redirect_uri = ""
 # Overrides the default auth provider URL. Used to support self-hosted gitlab, single-tenant Azure,
 # or any other third-party OIDC providers.
 url = ""
-# If enabled, the nonce check will be skipped. Required for local sign in with Google auth.
+# If enabled, the nonce check will be skipped. Keep disabled for the configured OAuth provider.
 skip_nonce_check = false
 # If enabled, it will allow the user to successfully authenticate when the provider does not return an email address.
 email_optional = false

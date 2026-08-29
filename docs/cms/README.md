@@ -82,6 +82,10 @@ Publish, republish, unpublish, and rollback call `request_story_publication`. Th
 - `/admin/stories/[id]`
 - `/admin/media`
 - `/admin/sources`
+- `/admin/pillars`
+- `/admin/categories`
+- `/admin/tags`
+- `/admin/authors` — read-only public byline records
 - `/admin/settings`
 
 ## Testing

@@ -26,6 +26,44 @@ export const createStorySchema = z.object({
   pillarId: z.uuid(),
 });
 
+export const tagInputSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  description: z.string().trim().max(300).optional(),
+});
+
+const editorialDescription = z.string().trim().max(500).optional();
+const editorialSortOrder = z.coerce.number().int().min(0).max(32767);
+
+export const createPillarSchema = z.object({
+  name: z.string().trim().min(1).max(80),
+  description: editorialDescription,
+  sortOrder: editorialSortOrder,
+});
+
+export const updatePillarSchema = z.object({
+  id: z.uuid(),
+  description: editorialDescription,
+  sortOrder: editorialSortOrder,
+});
+
+export const createCategorySchema = z.object({
+  pillarId: z.uuid(),
+  name: z.string().trim().min(1).max(80),
+  description: editorialDescription,
+  sortOrder: editorialSortOrder,
+});
+
+export const updateCategorySchema = z.object({
+  id: z.uuid(),
+  description: editorialDescription,
+  sortOrder: editorialSortOrder,
+});
+
+export const updateTagSchema = z.object({
+  id: z.uuid(),
+  description: z.string().trim().max(300).optional(),
+});
+
 export const sourceSchema = z.object({
   sourceType: z.enum([
     "book",
