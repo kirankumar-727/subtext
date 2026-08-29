@@ -1,7 +1,7 @@
 # Subtext Media Database Dependency Graph
 
 **Generated artifact — do not edit by hand.**  
-Schema fingerprint: `9e6802df88faa003b6798fa0db1b61ce35db2b2f6597c02c9c036ae6b960967f`
+Schema fingerprint: `fc96bd943f0b5676a236244ca4507499f7219a6ebaae21151aa841eb8d3f2552`
 
 ![Generated Subtext Media database dependency graph](./dependency-graph.svg)
 
@@ -63,6 +63,8 @@ flowchart LR
 8. `20260808000800_storage_buckets_and_policies.sql`
 9. `20260808001000_cms_atomic_commands.sql`
 10. `20260808001100_publishing_worker_commands.sql`
+11. `20260828000700_private_media_delivery.sql`
+12. `20260828000800_hide_public_storage_keys.sql`
 
 ## Table creation order
 

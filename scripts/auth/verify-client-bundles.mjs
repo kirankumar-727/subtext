@@ -10,6 +10,7 @@ const staticDirectories = [
 const forbiddenMarkers = [
   "SUPABASE_SECRET_KEY",
   "SUPABASE_SECRET_KEYS",
+  "PUBLIC_MEDIA_SIGNER_SECRET",
   "FOUNDER_EMAIL",
   "SUPABASE_ACCESS_TOKEN",
   "SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET",
@@ -20,6 +21,7 @@ const forbiddenMarkers = [
   "CRON_SECRET",
   ...[
     process.env.SUPABASE_SECRET_KEY,
+    process.env.PUBLIC_MEDIA_SIGNER_SECRET,
     process.env.FOUNDER_EMAIL,
     process.env.SUPABASE_ACCESS_TOKEN,
     process.env.SUPABASE_AUTH_EXTERNAL_GOOGLE_SECRET,

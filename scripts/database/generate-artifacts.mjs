@@ -370,9 +370,9 @@ function renderSchemaReference(schema, sourceSummary) {
     "",
     "# Supabase Storage policy summary",
     "",
-    "- `media-originals` is private. Only the future authenticated admin claim can insert/read; referenced originals cannot be deleted through the founder client.",
-    "- `media-public` is public-read. Only the future authenticated admin claim can insert; referenced derivatives cannot be deleted through the founder client.",
-    "- Bucket definitions and all `storage.objects` policies are migration-managed in `20260808000800_storage_buckets_and_policies.sql`.",
+    "- `media-originals` is private. Only the authenticated admin claim can insert/read; referenced originals cannot be deleted through the founder client.",
+    "- `media-public` is private. Public bytes are available only through `/api/media/{variantId}`, which rechecks the published projection and receives a short-lived signed URL from the protected `public-media` Edge Function; admins retain signed preview/remediation access.",
+    "- Anonymous roles have no `storage.buckets` or `storage.objects` SELECT privilege. Bucket definitions and all Storage policies are migration-managed in `20260808000800_storage_buckets_and_policies.sql` and subsequent security migrations.",
     "",
   );
 

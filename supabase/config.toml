@@ -437,3 +437,6 @@ verify_jwt = false
 
 [functions.publishing-worker]
 verify_jwt = false
+
+[functions.public-media]
+verify_jwt = false

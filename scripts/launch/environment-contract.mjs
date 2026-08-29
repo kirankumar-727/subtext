@@ -15,6 +15,7 @@ export const environmentTargets = {
     { name: "REVALIDATION_SECRET", kind: "secret", destination: "Vercel Public" },
     { name: "PUBLISHING_WORKER_SECRET", kind: "secret", destination: "Vercel Public" },
     { name: "CRON_SECRET", kind: "secret", destination: "Vercel Public" },
+    { name: "PUBLIC_MEDIA_SIGNER_SECRET", kind: "secret", destination: "Vercel Public" },
   ],
   admin: [
     {
@@ -65,6 +66,7 @@ export const environmentTargets = {
       destination: "Supabase Edge Functions",
     },
     { name: "REVALIDATION_SECRET", kind: "secret", destination: "Supabase Edge Functions" },
+    { name: "PUBLIC_MEDIA_SIGNER_SECRET", kind: "secret", destination: "Supabase Edge Functions" },
   ],
   operator: [
     { name: "SUPABASE_PROJECT_REF", kind: "project-ref", destination: "Operator/CI only" },

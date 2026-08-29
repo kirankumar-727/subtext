@@ -10,6 +10,7 @@ Generated from `scripts/launch/environment-contract.mjs`. Secret values must nev
 | public | `REVALIDATION_SECRET` | Vercel Public | secret | Required |
 | public | `PUBLISHING_WORKER_SECRET` | Vercel Public | secret | Required |
 | public | `CRON_SECRET` | Vercel Public | secret | Required |
+| public | `PUBLIC_MEDIA_SIGNER_SECRET` | Vercel Public | secret | Required |
 | admin | `NEXT_PUBLIC_SITE_URL` | Vercel Admin | https-url | Required |
 | admin | `NEXT_PUBLIC_ADMIN_URL` | Vercel Admin | https-url | Required |
 | admin | `NEXT_PUBLIC_SUPABASE_URL` | Vercel Admin | https-url | Required |
@@ -24,6 +25,7 @@ Generated from `scripts/launch/environment-contract.mjs`. Secret values must nev
 | supabase-functions | `PUBLISHING_WORKER_SECRET` | Supabase Edge Functions | secret | Required |
 | supabase-functions | `PUBLICATION_API_URL` | Supabase Edge Functions | https-url | Required |
 | supabase-functions | `REVALIDATION_SECRET` | Supabase Edge Functions | secret | Required |
+| supabase-functions | `PUBLIC_MEDIA_SIGNER_SECRET` | Supabase Edge Functions | secret | Required |
 | operator | `SUPABASE_PROJECT_REF` | Operator/CI only | project-ref | Required |
 | operator | `SUPABASE_ACCESS_TOKEN` | Operator/CI only | secret | Required |
 | operator | `SUPABASE_AUTH_EXTERNAL_GOOGLE_CLIENT_ID` | Operator/CI only | google-client | Required |

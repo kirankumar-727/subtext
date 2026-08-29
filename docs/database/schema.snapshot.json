@@ -1,5 +1,5 @@
 {
-  "fingerprint": "9e6802df88faa003b6798fa0db1b61ce35db2b2f6597c02c9c036ae6b960967f",
+  "fingerprint": "fc96bd943f0b5676a236244ca4507499f7219a6ebaae21151aa841eb8d3f2552",
   "migrations": [
     "20260808000100_extensions_and_enums.sql",
     "20260808000200_taxonomy_and_authors.sql",
@@ -10,7 +10,9 @@
     "20260808000700_row_level_security_and_grants.sql",
     "20260808000800_storage_buckets_and_policies.sql",
     "20260808001000_cms_atomic_commands.sql",
-    "20260808001100_publishing_worker_commands.sql"
+    "20260808001100_publishing_worker_commands.sql",
+    "20260828000700_private_media_delivery.sql",
+    "20260828000800_hide_public_storage_keys.sql"
   ],
   "schema": {
     "tables": [
@@ -10661,8 +10663,8 @@
       },
       {
         "name": "published_media",
-        "description": "Public derivative metadata only; private original object keys and rights notes are never selected.",
-        "definition": " SELECT am.id AS article_media_id,\n    a.id AS article_id,\n    am.revision_id,\n    am.role,\n    am.\"position\",\n    COALESCE(am.alt_text, ma.default_alt_text) AS alt_text,\n    COALESCE(am.caption, ma.default_caption) AS caption,\n    COALESCE(am.credit_override, ma.credit_text) AS credit_text,\n    ma.id AS media_asset_id,\n    ma.kind,\n    ma.width AS original_width,\n    ma.height AS original_height,\n    ma.focal_x,\n    ma.focal_y,\n    mv.id AS variant_id,\n    mv.variant_name,\n    mv.storage_key,\n    mv.mime_type,\n    mv.format,\n    mv.width,\n    mv.height,\n    mv.byte_size,\n    mv.checksum_sha256\n   FROM article_media am\n     JOIN articles a ON a.published_revision_id = am.revision_id\n     JOIN media_assets ma ON ma.id = am.media_asset_id\n     JOIN media_variants mv ON mv.media_asset_id = ma.id AND mv.is_public\n  WHERE (a.status = ANY (ARRAY['published_pending_verification'::article_status, 'published'::article_status])) AND ma.processing_status = 'ready'::media_processing_status AND (ma.rights_status <> ALL (ARRAY['unknown'::media_rights_status, 'restricted'::media_rights_status]));",
+        "description": "Public derivative metadata only; Storage object paths are resolved only by the privileged public-media signer.",
+        "definition": " SELECT am.id AS article_media_id,\n    a.id AS article_id,\n    am.revision_id,\n    am.role,\n    am.\"position\",\n    COALESCE(am.alt_text, ma.default_alt_text) AS alt_text,\n    COALESCE(am.caption, ma.default_caption) AS caption,\n    COALESCE(am.credit_override, ma.credit_text) AS credit_text,\n    ma.id AS media_asset_id,\n    ma.kind,\n    ma.width AS original_width,\n    ma.height AS original_height,\n    ma.focal_x,\n    ma.focal_y,\n    mv.id AS variant_id,\n    mv.variant_name,\n    mv.mime_type,\n    mv.format,\n    mv.width,\n    mv.height,\n    mv.byte_size,\n    mv.checksum_sha256\n   FROM article_media am\n     JOIN articles a ON a.published_revision_id = am.revision_id\n     JOIN authors au ON au.id = a.author_id AND au.is_active\n     JOIN pillars p ON p.id = a.primary_pillar_id AND p.is_active\n     JOIN media_assets ma ON ma.id = am.media_asset_id\n     JOIN media_variants mv ON mv.media_asset_id = ma.id AND mv.is_public\n  WHERE (a.status = ANY (ARRAY['published_pending_verification'::article_status, 'published'::article_status])) AND ma.processing_status = 'ready'::media_processing_status AND (ma.rights_status <> ALL (ARRAY['unknown'::media_rights_status, 'restricted'::media_rights_status]));",
         "columns": [
           {
             "table_name": "published_media",
@@ -10795,14 +10797,6 @@
           {
             "table_name": "published_media",
             "ordinal": 17,
-            "name": "storage_key",
-            "data_type": "text",
-            "underlying_type": "text",
-            "nullable": true
-          },
-          {
-            "table_name": "published_media",
-            "ordinal": 18,
             "name": "mime_type",
             "data_type": "text",
             "underlying_type": "text",
@@ -10810,7 +10804,7 @@
           },
           {
             "table_name": "published_media",
-            "ordinal": 19,
+            "ordinal": 18,
             "name": "format",
             "data_type": "text",
             "underlying_type": "text",
@@ -10818,7 +10812,7 @@
           },
           {
             "table_name": "published_media",
-            "ordinal": 20,
+            "ordinal": 19,
             "name": "width",
             "data_type": "integer",
             "underlying_type": "int4",
@@ -10826,7 +10820,7 @@
           },
           {
             "table_name": "published_media",
-            "ordinal": 21,
+            "ordinal": 20,
             "name": "height",
             "data_type": "integer",
             "underlying_type": "int4",
@@ -10834,7 +10828,7 @@
           },
           {
             "table_name": "published_media",
-            "ordinal": 22,
+            "ordinal": 21,
             "name": "byte_size",
             "data_type": "bigint",
             "underlying_type": "int8",
@@ -10842,7 +10836,7 @@
           },
           {
             "table_name": "published_media",
-            "ordinal": 23,
+            "ordinal": 22,
             "name": "checksum_sha256",
             "data_type": "text",
             "underlying_type": "text",

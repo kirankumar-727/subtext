@@ -12,6 +12,7 @@ import {
   getPublishedArticles,
   relatedStories,
 } from "@/lib/editorial";
+import { isSafePublicReference, sanitizePublicMarkdown } from "@/lib/public-markdown";
 import { buildArticleMetadata, buildArticleStructuredData } from "@/lib/seo";
 
 export const dynamic = "force-dynamic";
@@ -45,16 +46,22 @@ export default async function ArticlePage({ params }: ArticlePageProps) {
     getPublishedArticles(),
   ]);
   const hero = media.filter((item) => item.role === "hero");
+  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://subtext.media";
+  const markdownBody = sanitizePublicMarkdown(
+    article.bodyMarkdown,
+    citations.map((citation) => citation.citationKey),
+    siteUrl,
+  );
   const definitions = citations
-    .filter((citation) => !article.bodyMarkdown.includes(`[^${citation.citationKey}]:`))
     .map(
       (citation) =>
-        `[^${citation.citationKey}]: ${citation.citationText}${citation.url ? ` — ${citation.url}` : ""}`,
+        `[^${citation.citationKey}]: ${citation.citationText}${
+          citation.url && isSafePublicReference(citation.url, siteUrl) ? ` — ${citation.url}` : ""
+        }`,
     )
     .join("\n");
-  const markdown = definitions ? `${article.bodyMarkdown}\n\n${definitions}` : article.bodyMarkdown;
+  const markdown = [markdownBody, definitions].filter(Boolean).join("\n\n");
   const related = relatedStories(article, all);
-  const siteUrl = process.env.NEXT_PUBLIC_SITE_URL ?? "https://subtext.media";
   const { article: structured, breadcrumb } = buildArticleStructuredData(
     article,
     citations,

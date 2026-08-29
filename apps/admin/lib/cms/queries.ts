@@ -4,6 +4,16 @@ import { createSupabaseServerClient } from "@subtext/supabase/server";
 
 import { requireAdmin } from "@/lib/auth/authorization";
 
+async function createMediaSignedUrl(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  storageKey: string,
+) {
+  const { data, error } = await supabase.storage
+    .from("media-public")
+    .createSignedUrl(storageKey, 3600);
+  return error ? null : (data?.signedUrl ?? null);
+}
+
 export async function getWorkspaceReferenceData() {
   await requireAdmin();
   const supabase = await createSupabaseServerClient();
@@ -55,18 +65,20 @@ export async function getWorkspaceReferenceData() {
     categories: categories.data ?? [],
     tags: tags.data ?? [],
     sources: sources.data ?? [],
-    media: (media.data ?? []).map((asset) => {
-      const variant = variantByAsset.get(asset.id);
-      const publicUrl = variant
-        ? supabase.storage.from("media-public").getPublicUrl(variant.storage_key).data.publicUrl
-        : null;
-      return {
-        ...asset,
-        publicUrl,
-        width: variant?.width ?? null,
-        height: variant?.height ?? null,
-      };
-    }),
+    media: await Promise.all(
+      (media.data ?? []).map(async (asset) => {
+        const variant = variantByAsset.get(asset.id);
+        const publicUrl = variant
+          ? await createMediaSignedUrl(supabase, variant.storage_key)
+          : null;
+        return {
+          ...asset,
+          publicUrl,
+          width: variant?.width ?? null,
+          height: variant?.height ?? null,
+        };
+      }),
+    ),
   };
 }
 

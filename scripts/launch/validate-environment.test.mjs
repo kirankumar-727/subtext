@@ -7,6 +7,7 @@ const publicEnv = {
   REVALIDATION_SECRET: "r".repeat(32),
   PUBLISHING_WORKER_SECRET: "w".repeat(32),
   CRON_SECRET: "c".repeat(32),
+  PUBLIC_MEDIA_SIGNER_SECRET: "m".repeat(32),
 };
 assert.deepEqual(validateEnvironment("public", publicEnv), []);
 assert.ok(validateEnvironment("public", { ...publicEnv, REVALIDATION_SECRET: "short" }).length);
