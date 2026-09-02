@@ -1,12 +1,13 @@
 flowchart TD
-  Founder[Founder] --> Google[Google OAuth]
-  Google --> Supabase[Supabase Auth]
+  Founder[Founder] --> GitHub[GitHub OAuth]
+  GitHub --> Supabase[Supabase Auth]
   Supabase --> Admission{Signed exact-email admission hook}
   Admission -->|Rejected| Denied[Access Denied]
   Admission -->|Admitted| TokenHook[Signed custom access-token hook]
-  TokenHook --> Session[Authenticated session]
-  Session --> ServerCheck[Server-side founder authorization]
-  ServerCheck --> Decision{Authorization decision}
+  TokenHook --> RoleClaim[user_role=admin claim]
+  RoleClaim --> Session[Authenticated session]
+  Session --> RequireAdmin[requireAdmin()]
+  RequireAdmin --> Decision{Authorization decision}
   Decision -->|Unauthorized| Denied
   Decision -->|Authorized| Admin[Protected Admin Workspace]
   Admin --> RLS[RLS-protected PostgreSQL]

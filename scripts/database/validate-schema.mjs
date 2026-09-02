@@ -153,8 +153,87 @@ async function validateCatalog(database) {
   log(`${foreignKeyResult.rows[0].count} foreign-key constraints validated`);
 }
 
+async function validateStorageSecurity(database) {
+  const bucketResult = await database.query(`
+    select id, public
+    from storage.buckets
+    where id = 'media-public'
+  `);
+  assert.deepEqual(bucketResult.rows, [{ id: "media-public", public: false }]);
+
+  const privilegeResult = await database.query(`
+    select
+      has_table_privilege('anon', 'storage.buckets', 'select') as bucket_select,
+      has_table_privilege('anon', 'storage.objects', 'select') as object_select,
+      has_table_privilege('authenticated', 'storage.objects', 'select') as authenticated_object_select
+  `);
+  assert.deepEqual(privilegeResult.rows[0], {
+    bucket_select: false,
+    object_select: false,
+    authenticated_object_select: true,
+  });
+
+  const policyResult = await database.query(`
+    select policyname, cmd, roles::text as roles
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename = 'objects'
+      and policyname in (
+        'media_public_admin_delete_unreferenced',
+        'media_public_admin_insert',
+        'media_public_admin_select'
+      )
+    order by policyname
+  `);
+  assert.deepEqual(policyResult.rows, [
+    {
+      policyname: "media_public_admin_delete_unreferenced",
+      cmd: "DELETE",
+      roles: "{authenticated}",
+    },
+    { policyname: "media_public_admin_insert", cmd: "INSERT", roles: "{authenticated}" },
+    { policyname: "media_public_admin_select", cmd: "SELECT", roles: "{authenticated}" },
+  ]);
+
+  const anonymousPolicies = await database.query(`
+    select policyname
+    from pg_policies
+    where schemaname = 'storage'
+      and tablename in ('buckets', 'objects')
+      and roles::text like '%anon%'
+  `);
+  assert.deepEqual(anonymousPolicies.rows, []);
+
+  await database.query(
+    `insert into storage.objects (bucket_id, name) values ('media-public', '70000000-0000-0000-0000-000000000099/validator.webp')`,
+  );
+  await database.exec("set role anon");
+  await expectDatabaseError(
+    () => database.query(`select name from storage.objects where bucket_id = 'media-public'`),
+    "Anonymous Storage object listing unexpectedly succeeded",
+  );
+  await expectDatabaseError(
+    () => database.query(`select id from storage.buckets where id = 'media-public'`),
+    "Anonymous Storage bucket listing unexpectedly succeeded",
+  );
+  await database.exec("reset role");
+  await database.query(
+    `select set_config('request.jwt.claims', '{"role":"authenticated","user_role":"admin","sub":"20000000-0000-0000-0000-000000000099"}', false)`,
+  );
+  await database.exec("set role authenticated");
+  const adminObjectResult = await database.query(
+    `select name from storage.objects where bucket_id = 'media-public'`,
+  );
+  assert.deepEqual(adminObjectResult.rows, [
+    { name: "70000000-0000-0000-0000-000000000099/validator.webp" },
+  ]);
+  await database.exec("reset role");
+  log("authenticated admins retain signed-preview Storage object access");
+}
+
 async function validateBehavior(database) {
   await applySeed(database);
+  await validateStorageSecurity(database);
 
   const seedCounts = await database.query(`
     select

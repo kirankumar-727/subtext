@@ -1,26 +1,26 @@
-import { BrandMark } from "@subtext/ui";
-import Link from "next/link";
 import type { ReactNode } from "react";
-import { logout } from "@/app/auth/actions";
 
-export function WorkspaceShell({ children }: { children: ReactNode }) {
+import { logout } from "@/app/auth/actions";
+import { WorkspaceNavigation } from "@/components/workspace-navigation";
+import { getDashboardData } from "@/lib/cms/queries";
+
+export async function WorkspaceShell({ children }: { children: ReactNode }) {
+  let counts: { drafts: number | null; published: number | null; trash: number | null } = {
+    drafts: null,
+    published: null,
+    trash: 0,
+  };
+
+  try {
+    const data = await getDashboardData();
+    counts = { drafts: data.draftCount, published: data.publishedCount, trash: 0 };
+  } catch {
+    // The navigation should never hide a protected page if its optional counts fail to load.
+  }
+
   return (
-    <div className="workspace-shell">
-      <aside className="workspace-sidebar">
-        <BrandMark compact href="/admin" />
-        <nav aria-label="Writer workspace">
-          <Link href="/admin">Home</Link>
-          <Link href="/admin/stories">Stories</Link>
-          <Link href="/admin/media">Media</Link>
-          <Link href="/admin/sources">Sources</Link>
-          <span className="workspace-sidebar__rule" />
-          <Link href="/admin/settings">Settings</Link>
-        </nav>
-        <form action={logout}>
-          <button type="submit">Logout</button>
-        </form>
-      </aside>
-      <div className="workspace-main">{children}</div>
-    </div>
+    <WorkspaceNavigation counts={counts} logout={logout}>
+      {children}
+    </WorkspaceNavigation>
   );
 }

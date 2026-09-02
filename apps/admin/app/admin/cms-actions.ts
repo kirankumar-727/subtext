@@ -1,6 +1,6 @@
 "use server";
 
-import { deriveContentMetrics } from "@subtext/content";
+import { deriveContentMetrics, slugify } from "@subtext/content";
 import { createSupabaseServerClient } from "@subtext/supabase/server";
 import { createHash, randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
@@ -10,14 +10,93 @@ import sharp from "sharp";
 import { z } from "zod";
 
 import { requireAdmin } from "@/lib/auth/authorization";
-import type { StoryDraftInput } from "@/lib/cms/types";
+import { isSupportedImageUpload, mediaUploadRequestSchema, safeFilename } from "@/lib/cms/media";
+import type { MediaItem, SourceItem, SourceType, StoryDraftInput, TagItem } from "@/lib/cms/types";
 import { dispatchPublishingWorker } from "@/lib/publishing/dispatch";
 import {
+  createCategorySchema,
+  createPillarSchema,
   createStorySchema,
   initialSlug,
   sourceSchema,
   storyDraftSchema,
+  tagInputSchema,
+  updateCategorySchema,
+  updatePillarSchema,
+  updateTagSchema,
 } from "@/lib/cms/validation";
+
+async function readCurrentDraftForConflict(
+  supabase: Awaited<ReturnType<typeof createSupabaseServerClient>>,
+  articleId: string,
+): Promise<StoryDraftInput | null> {
+  const { data: article, error: articleError } = await supabase
+    .from("articles")
+    .select("row_version,canonical_slug,primary_pillar_id,category_id,current_draft_revision_id")
+    .eq("id", articleId)
+    .maybeSingle();
+
+  if (articleError || !article?.current_draft_revision_id) return null;
+
+  const revisionId = article.current_draft_revision_id;
+  const [revisionResult, tagsResult, citationsResult, heroResult] = await Promise.all([
+    supabase
+      .from("article_revisions")
+      .select("title,dek,body_markdown,seo_title,seo_description")
+      .eq("id", revisionId)
+      .maybeSingle(),
+    supabase.from("article_tags").select("tag_id").eq("article_id", articleId),
+    supabase
+      .from("citations")
+      .select("source_id,ordinal")
+      .eq("revision_id", revisionId)
+      .order("ordinal"),
+    supabase
+      .from("article_media")
+      .select("media_asset_id")
+      .eq("revision_id", revisionId)
+      .eq("role", "hero")
+      .maybeSingle(),
+  ]);
+
+  if (
+    revisionResult.error ||
+    tagsResult.error ||
+    citationsResult.error ||
+    heroResult.error ||
+    !revisionResult.data
+  ) {
+    return null;
+  }
+
+  const currentDraft = {
+    articleId,
+    rowVersion: Number(article.row_version),
+    title: revisionResult.data.title,
+    slug: article.canonical_slug,
+    excerpt: revisionResult.data.dek ?? "",
+    markdown: revisionResult.data.body_markdown,
+    pillarId: article.primary_pillar_id,
+    categoryId: article.category_id,
+    tagIds: (tagsResult.data ?? []).map((row) => row.tag_id),
+    sourceIds: (citationsResult.data ?? []).map((row) => row.source_id),
+    coverMediaAssetId: heroResult.data?.media_asset_id ?? null,
+    seoTitle: revisionResult.data.seo_title ?? "",
+    seoDescription: revisionResult.data.seo_description ?? "",
+  };
+  const parsed = storyDraftSchema.safeParse(currentDraft);
+  return parsed.success ? parsed.data : null;
+}
+
+function sourceFingerprint(source: z.infer<typeof sourceSchema>) {
+  return createHash("sha256")
+    .update(
+      [source.title, source.authorText ?? "", source.url ?? "", source.doi ?? ""]
+        .map((value) => value.toLowerCase())
+        .join("\n"),
+    )
+    .digest("hex");
+}
 
 export async function createStory(formData: FormData) {
   await requireAdmin();
@@ -28,9 +107,17 @@ export async function createStory(formData: FormData) {
   const markdown = `# ${input.title}\n\n`;
   const metrics = deriveContentMetrics(markdown);
   const supabase = await createSupabaseServerClient();
+  let slug = initialSlug(input.title);
+  const { data: existingSlug } = await supabase
+    .from("articles")
+    .select("id")
+    .eq("canonical_slug", slug)
+    .maybeSingle();
+  if (existingSlug) slug = `${slug}-${randomUUID().slice(0, 8)}`;
+
   const { data, error } = await supabase.rpc("create_story_draft", {
     p_title: input.title,
-    p_slug: initialSlug(input.title),
+    p_slug: slug,
     p_excerpt: "",
     p_body_markdown: markdown,
     p_body_plain_text: metrics.bodyPlainText,
@@ -39,7 +126,11 @@ export async function createStory(formData: FormData) {
     p_word_count: metrics.wordCount,
     p_reading_time_minutes: metrics.readingTimeMinutes,
   });
-  if (error || !data?.[0]) throw new Error("Unable to create story");
+
+  if (error || !data?.[0]) {
+    throw new Error("Unable to create story");
+  }
+
   redirect(`/admin/stories/${data[0].article_id}`);
 }
 
@@ -65,17 +156,28 @@ export async function saveStoryDraft(input: StoryDraftInput) {
     p_seo_description: draft.seoDescription,
     p_word_count: metrics.wordCount,
     p_reading_time_minutes: metrics.readingTimeMinutes,
+    p_citation_options: [],
+    p_media_placements: [],
   });
+
   if (error || !data?.[0]) {
+    if (error?.code === "40001") {
+      return {
+        ok: false as const,
+        code: "conflict" as const,
+        message:
+          "This story changed in another session. Review the current server draft before saving.",
+        currentDraft: await readCurrentDraftForConflict(supabase, draft.articleId),
+      };
+    }
+
     return {
       ok: false as const,
-      code: error?.code === "40001" ? "conflict" : "save_failed",
-      message:
-        error?.code === "40001"
-          ? "This story changed in another session."
-          : "Draft could not be saved.",
+      code: "save_failed" as const,
+      message: "Draft could not be saved.",
     };
   }
+
   revalidatePath(`/admin/stories/${draft.articleId}`);
   revalidatePath("/admin/stories");
   return { ok: true as const, value: data[0] };
@@ -97,14 +199,275 @@ export async function requestStoryPublication(input: z.infer<typeof publicationS
     p_target_revision_id: request.targetRevisionId,
     p_idempotency_key: randomUUID(),
   });
-  if (error || !data?.[0])
-    return { ok: false as const, message: "Publication request failed validation." };
+  if (error || !data?.[0]) {
+    return {
+      ok: false as const,
+      message:
+        error?.code === "23514"
+          ? "Publication request failed validation. Check required media, citations, rights, and SEO metadata."
+          : "Publication request could not be queued.",
+    };
+  }
   revalidatePath(`/admin/stories/${request.articleId}`);
   revalidatePath("/admin/stories");
   after(async () => {
     await dispatchPublishingWorker();
   });
   return { ok: true as const, value: data[0] };
+}
+
+export async function createTag(input: { name: string; description?: string | undefined }) {
+  await requireAdmin();
+  const parsed = tagInputSchema.parse(input);
+  const slug = slugify(parsed.name);
+  if (!slug) throw new Error("Invalid tag name");
+  const supabase = await createSupabaseServerClient();
+
+  const { data, error } = await supabase
+    .from("tags")
+    .insert({
+      name: parsed.name,
+      slug,
+      description: parsed.description || null,
+      is_active: true,
+    })
+    .select("id,name,slug")
+    .single();
+
+  if (error) {
+    if (error.code === "23505") {
+      const { data: existing } = await supabase
+        .from("tags")
+        .select("id,name,slug")
+        .eq("name", parsed.name)
+        .single();
+      if (existing) {
+        return { ok: true as const, tag: existing as TagItem };
+      }
+    }
+    throw new Error("Unable to create tag");
+  }
+
+  revalidatePath("/admin/stories");
+  revalidatePath("/admin/tags");
+  return { ok: true as const, tag: data as TagItem };
+}
+
+function editorialMutationMessage(error: { code?: string } | null, fallback: string) {
+  if (error?.code === "23505") return "That name or slug is already in use.";
+  if (error?.code === "23503") return "The selected editorial relationship no longer exists.";
+  if (error?.code === "23514")
+    return "The editorial record does not satisfy the existing database rules.";
+  return fallback;
+}
+
+export async function createPillar(input: {
+  name: string;
+  description?: string | undefined;
+  sortOrder?: number | undefined;
+}) {
+  await requireAdmin();
+  const parsed = createPillarSchema.parse({
+    name: input.name,
+    description: input.description,
+    sortOrder: input.sortOrder ?? 0,
+  });
+  const slug = slugify(parsed.name);
+  if (!slug) throw new Error("Invalid pillar name");
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("pillars")
+    .insert({
+      name: parsed.name,
+      slug,
+      description: parsed.description || null,
+      sort_order: parsed.sortOrder,
+      is_active: true,
+    })
+    .select("id,name,slug,description,sort_order,is_active,created_at,updated_at")
+    .single();
+  if (error || !data) {
+    return {
+      ok: false as const,
+      message: editorialMutationMessage(error, "Pillar could not be created."),
+    };
+  }
+  revalidatePath("/admin/pillars");
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/stories");
+  return { ok: true as const, pillar: data };
+}
+
+export async function updatePillar(input: {
+  id: string;
+  description?: string | undefined;
+  sortOrder?: number | undefined;
+}) {
+  await requireAdmin();
+  const parsed = updatePillarSchema.parse({
+    id: input.id,
+    description: input.description,
+    sortOrder: input.sortOrder ?? 0,
+  });
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("pillars")
+    .update({
+      description: parsed.description || null,
+      sort_order: parsed.sortOrder,
+    })
+    .eq("id", parsed.id)
+    .select("id,name,slug,description,sort_order,is_active,created_at,updated_at")
+    .single();
+  if (error || !data) {
+    return {
+      ok: false as const,
+      message: editorialMutationMessage(error, "Pillar could not be updated."),
+    };
+  }
+  revalidatePath("/admin/pillars");
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/stories");
+  return { ok: true as const, pillar: data };
+}
+
+export async function createCategory(input: {
+  pillarId: string;
+  name: string;
+  description?: string | undefined;
+  sortOrder?: number | undefined;
+}) {
+  await requireAdmin();
+  const parsed = createCategorySchema.parse({
+    pillarId: input.pillarId,
+    name: input.name,
+    description: input.description,
+    sortOrder: input.sortOrder ?? 0,
+  });
+  const slug = slugify(parsed.name);
+  if (!slug) throw new Error("Invalid category name");
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("categories")
+    .insert({
+      pillar_id: parsed.pillarId,
+      name: parsed.name,
+      slug,
+      description: parsed.description || null,
+      sort_order: parsed.sortOrder,
+      is_active: true,
+    })
+    .select("id,pillar_id,name,slug,description,sort_order,is_active,created_at,updated_at")
+    .single();
+  if (error || !data) {
+    return {
+      ok: false as const,
+      message: editorialMutationMessage(error, "Category could not be created."),
+    };
+  }
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/stories");
+  return { ok: true as const, category: data };
+}
+
+export async function updateCategory(input: {
+  id: string;
+  description?: string | undefined;
+  sortOrder?: number | undefined;
+}) {
+  await requireAdmin();
+  const parsed = updateCategorySchema.parse({
+    id: input.id,
+    description: input.description,
+    sortOrder: input.sortOrder ?? 0,
+  });
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("categories")
+    .update({
+      description: parsed.description || null,
+      sort_order: parsed.sortOrder,
+    })
+    .eq("id", parsed.id)
+    .select("id,pillar_id,name,slug,description,sort_order,is_active,created_at,updated_at")
+    .single();
+  if (error || !data) {
+    return {
+      ok: false as const,
+      message: editorialMutationMessage(error, "Category could not be updated."),
+    };
+  }
+  revalidatePath("/admin/categories");
+  revalidatePath("/admin/stories");
+  return { ok: true as const, category: data };
+}
+
+export async function updateTag(input: { id: string; description?: string | undefined }) {
+  await requireAdmin();
+  const parsed = updateTagSchema.parse(input);
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("tags")
+    .update({ description: parsed.description || null })
+    .eq("id", parsed.id)
+    .select("id,name,slug,description,is_active,created_at,updated_at")
+    .single();
+  if (error || !data) {
+    return {
+      ok: false as const,
+      message: editorialMutationMessage(error, "Tag could not be updated."),
+    };
+  }
+  revalidatePath("/admin/tags");
+  revalidatePath("/admin/stories");
+  return { ok: true as const, tag: data };
+}
+
+export async function createSourceInline(input: {
+  sourceType: SourceType;
+  title: string;
+  authorText?: string | undefined;
+  publisher?: string | undefined;
+  url?: string | undefined;
+  archiveUrl?: string | undefined;
+  isbn?: string | undefined;
+  doi?: string | undefined;
+}) {
+  const admin = await requireAdmin();
+  const source = sourceSchema.parse(input);
+  const supabase = await createSupabaseServerClient();
+  const { data, error } = await supabase
+    .from("sources")
+    .insert({
+      source_type: source.sourceType,
+      title: source.title,
+      author_text: source.authorText || null,
+      publisher: source.publisher || null,
+      url: source.url || null,
+      archive_url: source.archiveUrl || null,
+      isbn: source.isbn || null,
+      doi: source.doi || null,
+      created_by: admin.userId,
+    })
+    .select("id,title,author_text,publisher,source_type,url,archive_url,isbn,doi")
+    .single();
+
+  if (error) {
+    if (error.code === "23505") {
+      const { data: existing } = await supabase
+        .from("sources")
+        .select("id,title,author_text,publisher,source_type,url,archive_url,isbn,doi")
+        .eq("source_fingerprint", sourceFingerprint(source))
+        .maybeSingle();
+      if (existing) {
+        return { ok: true as const, source: existing as SourceItem };
+      }
+    }
+    throw new Error("Unable to create source");
+  }
+  revalidatePath("/admin/sources");
+  revalidatePath("/admin/stories");
+  return { ok: true as const, source: data as SourceItem };
 }
 
 export async function createSource(formData: FormData) {
@@ -131,32 +494,18 @@ export async function createSource(formData: FormData) {
     doi: source.doi || null,
     created_by: admin.userId,
   });
-  if (error) throw new Error("Unable to create source");
+  if (error) {
+    if (error.code === "23505") {
+      const { data: existing } = await supabase
+        .from("sources")
+        .select("id")
+        .eq("source_fingerprint", sourceFingerprint(source))
+        .maybeSingle();
+      if (existing) return;
+    }
+    throw new Error("Unable to create source");
+  }
   revalidatePath("/admin/sources");
-}
-
-const mediaInputSchema = z.object({
-  altText: z.string().trim().min(1).max(500),
-  caption: z.string().trim().max(1000).optional(),
-  credit: z.string().trim().max(300).optional(),
-  rightsStatus: z.enum([
-    "owned",
-    "licensed",
-    "public_domain",
-    "creative_commons",
-    "permission_granted",
-  ]),
-});
-const imageMimeTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/avif"]);
-
-function safeFilename(name: string) {
-  return (
-    name
-      .normalize("NFKD")
-      .replace(/[^A-Za-z0-9._-]+/g, "-")
-      .replace(/^-+|-+$/g, "")
-      .slice(0, 120) || "image"
-  );
 }
 
 export async function createMediaUploadIntent(input: {
@@ -165,31 +514,24 @@ export async function createMediaUploadIntent(input: {
   byteSize: number;
   checksumSha256: string;
   altText: string;
-  caption?: string;
-  credit?: string;
+  caption?: string | undefined;
+  credit?: string | undefined;
   rightsStatus: string;
 }) {
   const admin = await requireAdmin();
-  const fields = mediaInputSchema.parse(input);
-  if (
-    input.byteSize <= 0 ||
-    input.byteSize > 25 * 1024 * 1024 ||
-    !imageMimeTypes.has(input.mimeType)
-  ) {
-    throw new Error("Unsupported image");
-  }
-  if (!/^[0-9a-f]{64}$/.test(input.checksumSha256)) throw new Error("Invalid checksum");
+  const fields = mediaUploadRequestSchema.parse(input);
+  if (!isSupportedImageUpload(fields)) throw new Error("Unsupported image or checksum");
   const id = randomUUID();
-  const originalKey = `${id}/original-${safeFilename(input.filename)}`;
+  const originalKey = `${id}/original-${safeFilename(fields.filename)}`;
   const supabase = await createSupabaseServerClient();
   const { error: assetError } = await supabase.from("media_assets").insert({
     id,
     kind: "image",
-    original_filename: input.filename,
+    original_filename: fields.filename,
     original_storage_key: originalKey,
-    checksum_sha256: input.checksumSha256,
-    mime_type: input.mimeType,
-    byte_size: input.byteSize,
+    checksum_sha256: fields.checksumSha256,
+    mime_type: fields.mimeType,
+    byte_size: fields.byteSize,
     default_alt_text: fields.altText,
     default_caption: fields.caption || null,
     credit_text: fields.credit || null,
@@ -208,7 +550,9 @@ export async function createMediaUploadIntent(input: {
   return { id, path: originalKey, token: data.token };
 }
 
-export async function finalizeMediaUpload(mediaAssetId: string) {
+export async function finalizeMediaUpload(
+  mediaAssetId: string,
+): Promise<{ ok: true; media: MediaItem }> {
   await requireAdmin();
   const id = z.uuid().parse(mediaAssetId);
   const supabase = await createSupabaseServerClient();
@@ -222,7 +566,16 @@ export async function finalizeMediaUpload(mediaAssetId: string) {
   const { data: original, error: downloadError } = await supabase.storage
     .from("media-originals")
     .download(asset.original_storage_key);
-  if (downloadError || !original) throw new Error("Uploaded original could not be read");
+  if (downloadError || !original) {
+    await supabase
+      .from("media_assets")
+      .update({
+        processing_status: "failed",
+        processing_error: "Uploaded original could not be read",
+      })
+      .eq("id", id);
+    throw new Error("Uploaded original could not be read");
+  }
   const bytes = Buffer.from(await original.arrayBuffer());
   if (
     bytes.byteLength !== asset.byte_size ||
@@ -234,17 +587,24 @@ export async function finalizeMediaUpload(mediaAssetId: string) {
       .eq("id", id);
     throw new Error("Upload integrity check failed");
   }
-  const image = sharp(bytes, { failOn: "error" }).rotate();
-  const metadata = await image.metadata();
-  if (!metadata.width || !metadata.height) throw new Error("Image dimensions could not be read");
-  await supabase
-    .from("media_assets")
-    .update({ processing_status: "processing", width: metadata.width, height: metadata.height })
-    .eq("id", id);
+  const uploadedVariantKeys: string[] = [];
+  let variantsInserted = false;
   try {
+    const image = sharp(bytes, { failOn: "error" }).rotate();
+    const metadata = await image.metadata();
+    if (!metadata.width || !metadata.height) throw new Error("Image dimensions could not be read");
+    await supabase
+      .from("media_assets")
+      .update({ processing_status: "processing", width: metadata.width, height: metadata.height })
+      .eq("id", id);
+
     const widths = [640, 1280, 1920].filter((width) => width <= metadata.width!);
     if (widths.length === 0) widths.push(metadata.width);
     const variants = [];
+    let representativeKey: string | null = null;
+    let representativeWidth: number | null = null;
+    let representativeHeight: number | null = null;
+
     for (const width of [...new Set(widths)]) {
       const variantBytes = await image
         .clone()
@@ -256,28 +616,69 @@ export async function finalizeMediaUpload(mediaAssetId: string) {
         .from("media-public")
         .upload(key, variantBytes, { contentType: "image/webp", upsert: false });
       if (upload.error) throw upload.error;
+      uploadedVariantKeys.push(key);
       const variantMeta = await sharp(variantBytes).metadata();
+      const vWidth = variantMeta.width ?? width;
+      const vHeight =
+        variantMeta.height ?? Math.round((metadata.height! / metadata.width!) * width);
       variants.push({
         media_asset_id: id,
         variant_name: `w${width}`,
         storage_key: key,
         mime_type: "image/webp",
         format: "webp",
-        width: variantMeta.width ?? width,
-        height: variantMeta.height ?? Math.round((metadata.height! / metadata.width!) * width),
+        width: vWidth,
+        height: vHeight,
         byte_size: variantBytes.byteLength,
         checksum_sha256: createHash("sha256").update(variantBytes).digest("hex"),
         is_public: true,
       });
+      if (!representativeKey) {
+        representativeKey = key;
+        representativeWidth = vWidth;
+        representativeHeight = vHeight;
+      }
     }
     const { error: variantsError } = await supabase.from("media_variants").insert(variants);
     if (variantsError) throw variantsError;
+    variantsInserted = true;
     const { error: readyError } = await supabase
       .from("media_assets")
       .update({ processing_status: "ready", processing_error: null })
       .eq("id", id);
     if (readyError) throw readyError;
+
+    const publicUrl = representativeKey
+      ? supabase.storage.from("media-public").getPublicUrl(representativeKey).data.publicUrl
+      : null;
+
+    revalidatePath("/admin/media");
+    revalidatePath("/admin/stories");
+
+    return {
+      ok: true as const,
+      media: {
+        id: asset.id,
+        kind: asset.kind,
+        original_filename: asset.original_filename,
+        mime_type: asset.mime_type,
+        byte_size: asset.byte_size,
+        default_alt_text: asset.default_alt_text,
+        default_caption: asset.default_caption,
+        credit_text: asset.credit_text,
+        rights_status: asset.rights_status,
+        processing_status: "ready",
+        created_at: asset.created_at,
+        publicUrl,
+        hasPublicVariant: Boolean(representativeKey),
+        width: representativeWidth,
+        height: representativeHeight,
+      },
+    };
   } catch {
+    if (!variantsInserted && uploadedVariantKeys.length) {
+      await supabase.storage.from("media-public").remove(uploadedVariantKeys);
+    }
     await supabase
       .from("media_assets")
       .update({
@@ -287,8 +688,6 @@ export async function finalizeMediaUpload(mediaAssetId: string) {
       .eq("id", id);
     throw new Error("Image processing failed");
   }
-  revalidatePath("/admin/media");
-  return { ok: true as const };
 }
 
 export async function updateSiteSettings(formData: FormData) {

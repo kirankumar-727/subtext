@@ -4,7 +4,7 @@
 | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------- |
 | A. Unauthenticated `/admin`           | `proxy-boundary.test.ts` asserts redirect to `/login` and cookie preservation                                    |
 | B. Founder can access                 | `authorization-core.test.ts` verifies fresh claims + user; proxy and API tests accept founder                    |
-| C. Unauthorized Google account denied | core, hook-policy, and proxy tests reject mismatched email/claim                                                 |
+| C. Unauthorized GitHub account denied | core, hook-policy, and proxy tests reject mismatched email/claim                                                 |
 | D. Unauthorized protected API         | proxy test and actual protected route handler return 401/403                                                     |
 | E. Unauthorized server action         | direct invocation of `protectedAdminActionProbe` rejects before operation                                        |
 | F. Unauthenticated database access    | `scripts/auth/validate-rls.mjs` executes as PostgreSQL `anon` and confirms rejection                             |
@@ -14,7 +14,7 @@
 | J. Expired/invalid session            | core test makes fresh `getUser()` fail and confirms unauthenticated result                                       |
 | K. Service credential exposure        | post-build scanner checks browser assets and mandatory `server-only` modules                                     |
 | L. Direct URL access                  | proxy tests call `/admin/direct-url` and `/api/admin/session` directly                                           |
-| Admission hook                        | hook-policy tests admit only exact Google founder identity                                                       |
+| Admission hook                        | hook-policy tests admit only exact GitHub founder identity                                                       |
 | RLS claim hook                        | hook-policy tests grant `user_role=admin` only to founder and erase forged claims                                |
 | Regression                            | root `npm run check` runs formatting, lint, types, all tests, generated-artifact checks, builds, and bundle scan |
 

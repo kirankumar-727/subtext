@@ -1305,7 +1305,6 @@ export type Database = {
           focal_y: number | null;
           variant_id: string | null;
           variant_name: string | null;
-          storage_key: string | null;
           mime_type: string | null;
           format: string | null;
           width: number | null;

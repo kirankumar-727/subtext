@@ -53,7 +53,7 @@ Article revision rows remain immutable. Every meaningful save inserts a new row 
 
 ## Media workflow
 
-An authorized server action creates a one-time signed upload intent, so the browser sends image bytes directly to Supabase Storage instead of crossing Vercel request-size limits. The token is scoped to one private object path and carries no CMS authorization. A second authorized server action downloads and verifies the checksum/size before processing. The original object remains only in the private `media-originals` bucket. Sharp reads orientation and metadata, then produces deterministic WebP derivatives at fixed widths without upscaling. Public derivatives go to `media-public`; `media_assets` and `media_variants` preserve checksums, dimensions, alt text, credit, rights, and processing state. Failed processing is explicit. Private original keys are never rendered in the browser.
+An authorized server action creates a one-time signed upload intent, so the browser sends image bytes directly to Supabase Storage instead of crossing Vercel request-size limits. The token is scoped to one private object path and carries no CMS authorization. A second authorized server action downloads and verifies the checksum/size before processing. The original object remains only in the private `media-originals` bucket. Sharp reads orientation and metadata, then produces deterministic WebP derivatives at fixed widths without upscaling. Derivatives go to the private `media-public` bucket; the public site resolves only a variant UUID through `/api/media/{variantId}`, whose protected `public-media` Edge Function rechecks the published projection and returns a short-lived signed redirect. Admin preview and remediation use authenticated signed URLs. `media_assets` and `media_variants` preserve checksums, dimensions, alt text, credit, rights, and processing state. Failed processing is explicit. Private original keys are never rendered in the browser.
 
 ## Source and citation workflow
 
@@ -82,6 +82,10 @@ Publish, republish, unpublish, and rollback call `request_story_publication`. Th
 - `/admin/stories/[id]`
 - `/admin/media`
 - `/admin/sources`
+- `/admin/pillars`
+- `/admin/categories`
+- `/admin/tags`
+- `/admin/authors` — read-only public byline records
 - `/admin/settings`
 
 ## Testing

@@ -139,7 +139,6 @@ const loadMedia = unstable_cache(
         !row.article_id ||
         !row.media_asset_id ||
         !row.variant_name ||
-        !row.storage_key ||
         !row.mime_type ||
         !row.width ||
         !row.height
@@ -155,7 +154,9 @@ const loadMedia = unstable_cache(
           creditText: row.credit_text ?? null,
           assetId: row.media_asset_id,
           variantName: row.variant_name,
-          url: supabase.storage.from("media-public").getPublicUrl(row.storage_key).data.publicUrl,
+          // The bucket is private. This stable route re-authorizes the variant
+          // against the published projection before issuing a short-lived URL.
+          url: `/api/media/${row.variant_id}`,
           width: row.width,
           height: row.height,
           mimeType: row.mime_type,
