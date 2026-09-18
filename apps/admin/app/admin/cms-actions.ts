@@ -815,7 +815,7 @@ export async function importStoryPackage(
   packageJson: string,
   zipBytes: Uint8Array,
 ): Promise<
-  | { ok: true; articleId: string }
+  | { ok: true; articleId: string; coverMediaAssetId: string | null }
   | { ok: false; errors: Array<{ code: string; message: string }> }
 > {
   await requireAdmin();
@@ -889,7 +889,7 @@ export async function importStoryPackage(
   if (result.ok) {
     revalidatePath("/admin/stories");
     revalidatePath(`/admin/stories/${result.articleId}`);
-    return { ok: true, articleId: result.articleId };
+    return { ok: true, articleId: result.articleId, coverMediaAssetId: result.coverMediaAssetId };
   }
 
   return { ok: false, errors: result.errors };

@@ -55,7 +55,7 @@ export type ImportError = {
 };
 
 export type ImportResult =
-  | { ok: true; articleId: string; revisionId: string }
+  | { ok: true; articleId: string; revisionId: string; coverMediaAssetId: string | null }
   | { ok: false; errors: ImportError[] };
 
 // ---------------------------------------------------------------------------
@@ -308,13 +308,21 @@ export async function executeStoryImport(
   }
 
   const articleId = storyResult[0].article_id as string;
-  const revisionId = storyResult[0].revision_id as string;
   const rowVersion = storyResult[0].row_version as number;
 
   // Track created resources for cleanup on failure
   const createdTagIds: string[] = [];
   const createdSourceIds: string[] = [];
   const createdMediaAssetIds: string[] = [];
+  // Track successfully created media for linking to the revision
+  type MediaPlacementEntry = {
+    mediaAssetId: string;
+    altText: string;
+    caption: string | null;
+    credit: string | null;
+    isCover: boolean;
+  };
+  const mediaPlacements: MediaPlacementEntry[] = [];
 
   try {
     // --- Create/reconcile tags ---
@@ -451,7 +459,7 @@ export async function executeStoryImport(
     }
 
     // --- Update the draft with tags, sources, SEO metadata ---
-    const { error: saveError } = await supabase.rpc("save_story_draft", {
+    const { data: saveResult, error: saveError } = await supabase.rpc("save_story_draft", {
       p_article_id: articleId,
       p_expected_row_version: rowVersion,
       p_title: fm.title,
@@ -472,13 +480,17 @@ export async function executeStoryImport(
       p_media_placements: [],
     });
 
-    if (saveError) {
+    if (saveError || !saveResult?.[0]) {
       errors.push({
         code: "draft_save_failed",
         message: "Failed to save imported draft metadata.",
       });
       throw new Error("Draft save failed");
     }
+
+    // save_story_draft creates a new revision that supersedes the initial one.
+    // This is the current draft revision that media should be linked to.
+    const currentRevisionId = saveResult[0].revision_id as string;
 
     // --- Create media asset records ---
     // Images are stored but not processed yet (they need user to verify rights)
@@ -573,17 +585,52 @@ export async function executeStoryImport(
 
       createdMediaAssetIds.push(mediaAssetId);
 
-      // NOTE: We intentionally do NOT assign this media as the hero/cover here.
-      // Imported media has processing_status = 'pending'. The existing
-      // attach_revision_relations RPC requires processing_status = 'ready'
-      // for cover media (errcode 23514: 'Cover media must be fully processed').
-      //
-      // The user must process the image in the media library, then assign it
-      // as cover in the story editor. The intended hero relationship is
-      // preserved via the frontmatter metadata and the media asset record.
-      //
-      // This is consistent with the existing SubText publication-readiness
-      // model: pending media blocks publication until processed.
+      // Track this media for linking to the revision.
+      // We do NOT assign hero/cover here: imported media is pending, and the
+      // user must process it in the media library before assigning as cover.
+      // The intended cover reference is preserved for the editor to suggest.
+      const coverRef = typeof fm.cover === "string" ? fm.cover : null;
+      const isCover =
+        coverRef === img.archivePath ||
+        coverRef === filename ||
+        coverRef === `images/${filename}`;
+
+      mediaPlacements.push({
+        mediaAssetId,
+        altText,
+        caption,
+        credit,
+        isCover,
+      });
+    }
+
+    // --- Link media to the current draft revision ---
+    // Insert article_media records using the existing revision-media model.
+    // All imported images are placed as 'inline' — the user assigns hero
+    // after processing. The cover reference is preserved in the placement
+    // metadata so the editor can suggest it.
+    if (mediaPlacements.length > 0) {
+      const articleMediaRecords = mediaPlacements.map((entry, index) => ({
+        revision_id: currentRevisionId,
+        media_asset_id: entry.mediaAssetId,
+        role: "inline" as const,
+        position: index,
+        alt_text: entry.altText,
+        caption: entry.caption,
+        credit_override: entry.credit,
+      }));
+
+      const { error: linkError } = await supabase
+        .from("article_media")
+        .insert(articleMediaRecords);
+
+      if (linkError) {
+        errors.push({
+          code: "media_link_failed",
+          message: "Failed to associate imported images with the story revision.",
+        });
+        throw new Error("Media linking failed");
+      }
     }
 
     // If there were critical errors, clean up
@@ -591,12 +638,33 @@ export async function executeStoryImport(
       throw new Error("Import had critical errors");
     }
 
-    return { ok: true, articleId, revisionId };
+    // Return the current revision ID (from save_story_draft, not the initial one)
+    // and the intended cover media asset ID (null if no cover reference found).
+    const coverEntry = mediaPlacements.find((p) => p.isCover);
+    return {
+      ok: true,
+      articleId,
+      revisionId: currentRevisionId,
+      coverMediaAssetId: coverEntry?.mediaAssetId ?? null,
+    };
   } catch {
     // --- Cleanup on failure ---
-    // Remove media assets and uploaded files
+    //
+    // Safety constraints that limit cleanup:
+    // - article_media rows are immutable (prevent_update_or_delete trigger).
+    //   Media assets linked via article_media cannot be deleted because
+    //   media_assets.id has ON DELETE RESTRICT from article_media.
+    // - citations rows are immutable. Sources linked via citations cannot be
+    //   deleted because sources.id has ON DELETE RESTRICT from citations.
+    // - Tags are reusable entities; leaving newly created tags is harmless.
+    //
+    // Strategy: attempt cleanup of each resource. Supabase returns an error
+    // when a FK/trigger blocks deletion, which we accept silently. The article
+    // remains as an unpublished draft that the admin can manage or archive.
+
+    // Attempt to remove media storage files and asset records.
+    // Assets already linked via article_media will fail silently.
     for (const mediaAssetId of createdMediaAssetIds) {
-      // Remove storage files
       const { data: asset } = await supabase
         .from("media_assets")
         .select("original_storage_key")
@@ -607,20 +675,23 @@ export async function executeStoryImport(
           .from("media-originals")
           .remove([asset.original_storage_key]);
       }
+      // Will fail silently if article_media references this asset (ON DELETE RESTRICT)
       await supabase.from("media_assets").delete().eq("id", mediaAssetId);
     }
 
-    // Remove created sources
+    // Attempt to remove newly created sources.
+    // Sources already referenced by citations will fail silently (ON DELETE RESTRICT).
     for (const sourceId of createdSourceIds) {
       await supabase.from("sources").delete().eq("id", sourceId);
     }
 
-    // Remove created tags (only if we created them, not if they pre-existed)
-    // We can't easily distinguish, so we leave tags as they are
-    // (tags are not harmful if orphaned)
+    // Tags: newly created tags are left as-is. They are reusable editorial
+    // entities and do not create incorrect relationships when orphaned.
 
-    // The article and revision will be cleaned up as a draft
-    // They won't be published since we don't call requestStoryPublication
+    // Article and revision: left as an unpublished draft. The admin can
+    // archive it via the existing delete flow. Hard deletion is impossible
+    // because article_revisions has ON DELETE RESTRICT from articles and
+    // the immutable trigger prevents revision deletion.
 
     return { ok: false, errors };
   }

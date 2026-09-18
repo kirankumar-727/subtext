@@ -91,7 +91,12 @@ function createRealisticMock() {
 
       if (name === "save_story_draft") {
         return Promise.resolve({
-          data: [{ article_id: args.p_article_id, row_version: 2 }],
+          data: [{
+            article_id: args.p_article_id,
+            revision_id: "rev-e2e-0002",
+            row_version: 2,
+            saved_at: new Date().toISOString(),
+          }],
           error: null,
         });
       }
@@ -178,7 +183,7 @@ function createRealisticMock() {
         };
       }
 
-      if (table === "article_media_assets" || table === "media_asset_sources") {
+      if (table === "article_media") {
         return {
           insert: vi.fn().mockImplementation((data: Record<string, unknown>) => {
             inserts.push({ table, data });
@@ -273,7 +278,7 @@ describe.skipIf(!zipAvailable)("E2E full import execution — canonical ZIP", ()
     }
 
     expect(importResult.articleId).toBe("art-e2e-0001");
-    expect(importResult.revisionId).toBe("rev-e2e-0001");
+    expect(importResult.revisionId).toBe("rev-e2e-0002");
 
     // ---- Verify RPC calls ----
 
@@ -327,9 +332,21 @@ describe.skipIf(!zipAvailable)("E2E full import execution — canonical ZIP", ()
       expect(upload.size).toBeGreaterThan(0);
     }
 
-    // ---- Verify NO hero cover assigned ----
-    const heroInserts = mock.inserts.filter((i) => i.table === "article_media_assets");
+    // ---- Verify media linked as inline (not hero) ----
+    const articleMediaInserts = mock.inserts.filter((i) => i.table === "article_media");
+    expect(articleMediaInserts.length).toBeGreaterThanOrEqual(4);
+    for (const am of articleMediaInserts) {
+      expect(am.data.role).toBe("inline");
+      expect(am.data.revision_id).toBe("rev-e2e-0002");
+      expect(am.data.alt_text).toBeTruthy();
+      expect(am.data.position).toBeGreaterThanOrEqual(0);
+    }
+    // No hero role inserted — pending media cannot be hero
+    const heroInserts = articleMediaInserts.filter((am) => am.data.role === "hero");
     expect(heroInserts).toHaveLength(0);
+
+    // ---- Verify cover reference preserved ----
+    expect(importResult.coverMediaAssetId).toBeTruthy();
 
     // ---- Verify no rollbacks occurred ----
     expect(mock.deletes).toHaveLength(0);

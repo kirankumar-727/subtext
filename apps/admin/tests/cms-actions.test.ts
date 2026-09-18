@@ -854,20 +854,9 @@ describe("C1 — executeStoryImport does not assign hero cover for pending media
             }),
           };
         }
-        if (table === "article_media_assets") {
+        if (table === "article_media") {
           return {
-            insert: () => ({
-              then: (resolve: (v: { error: null }) => void) =>
-                resolve({ error: null }),
-            }),
-          };
-        }
-        if (table === "media_asset_sources") {
-          return {
-            insert: () => ({
-              then: (resolve: (v: { error: null }) => void) =>
-                resolve({ error: null }),
-            }),
+            insert: vi.fn().mockResolvedValue({ error: null }),
           };
         }
         // Fallback
@@ -899,6 +888,17 @@ describe("C1 — executeStoryImport does not assign hero cover for pending media
                 row_version: 1,
               },
             ],
+            error: null,
+          });
+        }
+        if (name === "save_story_draft") {
+          return Promise.resolve({
+            data: [{
+              article_id: args.p_article_id,
+              revision_id: "rev-saved-001",
+              row_version: 2,
+              saved_at: new Date().toISOString(),
+            }],
             error: null,
           });
         }
