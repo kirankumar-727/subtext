@@ -11,6 +11,7 @@
  */
 
 import { slugify } from "@subtext/content";
+import { inflateRawSync } from "node:zlib";
 import { z } from "zod";
 
 // ---------------------------------------------------------------------------
@@ -622,19 +623,11 @@ export async function parseStoryPackage(
   // If it doesn't, discover images from the actual files in images/ and enrich
   // them with metadata from media.md where available.
   if (parsedFrontmatter.success && !parsedFrontmatter.data.images && imageEntries.length > 0) {
-    const coverRef =
-      typeof frontmatter.cover === "string" ? frontmatter.cover : null;
-
     for (const img of imageEntries) {
       const filename = img.archivePath.replace("images/", "");
       const meta = imageMeta.find(
         (m) => m.filename === filename || m.filename === filename.replace(/\.[^.]+$/, ""),
       );
-      const isCover =
-        coverRef === img.archivePath ||
-        coverRef === filename ||
-        coverRef === `images/${filename}`;
-
       if (meta) {
         if (meta.rightsStatus === "pending" || meta.rightsStatus === "unknown") {
           warnings.push({
@@ -761,9 +754,7 @@ function parseZipEntries(bytes: Uint8Array): ZipEntry[] {
  * Synchronous DEFLATE decompression using Node.js zlib.
  */
 function inflateSync(compressed: Uint8Array): Uint8Array {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const zlib = require("node:zlib") as typeof import("node:zlib");
-  const buf = zlib.inflateRawSync(Buffer.from(compressed));
+  const buf = inflateRawSync(Buffer.from(compressed));
   return new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
 }
 
