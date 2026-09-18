@@ -103,11 +103,23 @@ function NavigationIcon({ name }: { name: IconName }) {
     );
   }
 
-  if (name === "stories" || name === "drafts" || name === "published") {
+  if (name === "stories" || name === "drafts") {
     return (
       <svg {...commonProps}>
         <path d="M6 3.5h8.2L18 7.3v13.2H6z" />
         <path d="M14 3.5v4h4M9 11h6M9 14.5h6M9 18h3.5" />
+      </svg>
+    );
+  }
+
+  if (name === "published") {
+    return (
+      <svg {...commonProps}>
+        <path d="M5 7h8.5a3 3 0 0 1 3 3v1" />
+        <path d="m14 8.5 3-3 3 3" />
+        <path d="M19 12v4.5a3 3 0 0 1-3 3H7a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h5" />
+        <path d="M8 13h5M8 16h5" />
+        <circle cx="17" cy="6" r="2.5" />
       </svg>
     );
   }
@@ -156,8 +168,13 @@ function NavigationIcon({ name }: { name: IconName }) {
   if (name === "sources") {
     return (
       <svg {...commonProps}>
-        <path d="M5 4.5h9a3 3 0 0 1 3 3v12H8a3 3 0 0 0-3 0z" />
-        <path d="M17 19.5h2V7.5a3 3 0 0 0-3-3h-2M8 9h5M8 12.5h5" />
+        <circle cx="5" cy="5" r="1.8" />
+        <circle cx="19" cy="5" r="1.8" />
+        <circle cx="5" cy="12" r="1.8" />
+        <circle cx="19" cy="12" r="1.8" />
+        <path d="M6.8 5h3.7c.9 0 1.5.7 1.5 1.5v10M17.2 5h-3.7c-.9 0-1.5.7-1.5 1.5M6.8 12h3.7c.9 0 1.5.7 1.5 1.5v3" />
+        <path d="M12 17.5 7 20.5h10z" />
+        <path d="M12 3v3" />
       </svg>
     );
   }
