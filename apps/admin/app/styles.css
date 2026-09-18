@@ -5973,3 +5973,10 @@ summary:focus-visible {
     text-align: left;
   }
 }
+
+/* Keep the collapsed desktop navigation control visible at every responsive width. */
+.workspace-shell--collapsed .workspace-sidebar__desktop-menu {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
