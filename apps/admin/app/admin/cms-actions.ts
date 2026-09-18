@@ -714,3 +714,183 @@ export async function updateSiteSettings(formData: FormData) {
   if (error) throw new Error("Settings could not be saved");
   revalidatePath("/admin/settings");
 }
+
+// ---------------------------------------------------------------------------
+// Story lifecycle
+// ---------------------------------------------------------------------------
+
+const deleteStorySchema = z.object({
+  articleId: z.uuid(),
+});
+
+export async function deleteStoryDraft(input: { articleId: string }) {
+  await requireAdmin();
+  const { articleId } = deleteStorySchema.parse(input);
+  const supabase = await createSupabaseServerClient();
+
+  // Verify the story exists and is NOT published
+  const { data: article, error: readError } = await supabase
+    .from("articles")
+    .select("id,status,published_revision_id")
+    .eq("id", articleId)
+    .single();
+
+  if (readError || !article) {
+    return { ok: false as const, message: "Story not found." };
+  }
+
+  if (article.status === "published") {
+    return {
+      ok: false as const,
+      message: "A published story cannot be deleted. Unpublish it first, then delete.",
+    };
+  }
+
+  if (article.status === "publishing" || article.status === "scheduled" || article.status === "published_pending_verification") {
+    return {
+      ok: false as const,
+      message:
+        "This story is currently in the publication pipeline. Cancel or wait for it to finish, then delete.",
+    };
+  }
+
+  // Archive the story (soft delete)
+  const { error: updateError } = await supabase
+    .from("articles")
+    .update({
+      status: "archived",
+      archived_at: new Date().toISOString(),
+    })
+    .eq("id", articleId);
+
+  if (updateError) {
+    return { ok: false as const, message: "Story could not be deleted." };
+  }
+
+  revalidatePath("/admin/stories");
+  revalidatePath(`/admin/stories/${articleId}`);
+  return { ok: true as const };
+}
+
+export async function validateStoryPackage(
+  zipBytes: Uint8Array,
+): Promise<
+  | { ok: true; preview: Awaited<ReturnType<typeof import("@/lib/cms/story-package-import").generateImportPreview>>; packageJson: string }
+  | { ok: false; errors: Array<{ code: string; level: "error" | "warning"; message: string }>; warnings: Array<{ code: string; level: "error" | "warning"; message: string }> }
+> {
+  await requireAdmin();
+
+  const { parseStoryPackage } = await import("@/lib/cms/story-package");
+  const { generateImportPreview } = await import("@/lib/cms/story-package-import");
+
+  const result = await parseStoryPackage(zipBytes);
+
+  if (!result.ok) {
+    return { ok: false, errors: result.errors, warnings: result.warnings };
+  }
+
+  const preview = await generateImportPreview(result.pkg);
+
+  // Serialize text-only metadata for the import step.
+  // Binary image data is NOT included — the client will re-send the
+  // original ZIP bytes alongside this packageJson for the import step.
+  const packageJson = JSON.stringify({
+    storyMarkdown: result.pkg.storyMarkdown,
+    frontmatter: result.pkg.frontmatter,
+    imageMeta: result.pkg.images.map((img) => ({
+      archivePath: img.archivePath,
+      extension: img.extension,
+    })),
+    sources: result.pkg.sources,
+    metadataFiles: result.pkg.metadataFiles,
+    allPaths: result.pkg.allPaths,
+    parsedSources: result.pkg.parsedSources,
+    imageMetadata: result.pkg.imageMetadata,
+  });
+
+  return { ok: true, preview, packageJson };
+}
+
+export async function importStoryPackage(
+  packageJson: string,
+  zipBytes: Uint8Array,
+): Promise<
+  | { ok: true; articleId: string }
+  | { ok: false; errors: Array<{ code: string; message: string }> }
+> {
+  await requireAdmin();
+
+  const { parseStoryPackage } = await import("@/lib/cms/story-package");
+  const { executeStoryImport } = await import("@/lib/cms/story-package-import");
+
+  // Re-parse the ZIP to extract image binary data.
+  // This avoids round-tripping base64 image bytes through the server-action response.
+  const parseResult = await parseStoryPackage(zipBytes);
+  if (!parseResult.ok) {
+    return {
+      ok: false,
+      errors: parseResult.errors.map((e) => ({ code: e.code, message: e.message })),
+    };
+  }
+
+  // Deserialize the text-only metadata
+  const raw = JSON.parse(packageJson) as {
+    storyMarkdown: string;
+    frontmatter: Record<string, unknown>;
+    imageMeta: Array<{ archivePath: string; extension: string }>;
+    sources: Array<{ archivePath: string; text: string }>;
+    metadataFiles: Record<string, string>;
+    allPaths: string[];
+    parsedSources: Array<{
+      ordinal: number;
+      title: string;
+      author: string | null;
+      url: string | null;
+      isbn: string | null;
+      doi: string | null;
+      publisher: string | null;
+      sourceType: string;
+    }>;
+    imageMetadata: Array<{
+      filename: string;
+      altText: string | null;
+      caption: string | null;
+      credit: string | null;
+      rightsStatus: string;
+      role: string | null;
+    }>;
+  };
+
+  // Reconstruct the package using re-parsed image data from the ZIP
+  const parsedImagesByPath = new Map(
+    parseResult.pkg.images.map((img) => [img.archivePath, img]),
+  );
+
+  const pkg = {
+    storyMarkdown: raw.storyMarkdown,
+    frontmatter: raw.frontmatter,
+    images: raw.imageMeta.map((meta) => {
+      const parsed = parsedImagesByPath.get(meta.archivePath);
+      return {
+        archivePath: meta.archivePath,
+        data: parsed?.data ?? new Uint8Array(0),
+        extension: meta.extension,
+      };
+    }),
+    sources: raw.sources,
+    metadataFiles: raw.metadataFiles,
+    allPaths: raw.allPaths,
+    parsedSources: parseResult.pkg.parsedSources,
+    imageMetadata: parseResult.pkg.imageMetadata,
+  };
+
+  const result = await executeStoryImport(pkg);
+
+  if (result.ok) {
+    revalidatePath("/admin/stories");
+    revalidatePath(`/admin/stories/${result.articleId}`);
+    return { ok: true, articleId: result.articleId };
+  }
+
+  return { ok: false, errors: result.errors };
+}

@@ -23,9 +23,10 @@ function formatDate(value: string | null | undefined) {
 }
 
 function statusLabel(status: string) {
-  return status === "unpublished"
-    ? "Unpublished"
-    : `${status.slice(0, 1).toUpperCase()}${status.slice(1).replaceAll("_", " ")}`;
+  if (status === "unpublished") return "Unpublished";
+  if (status === "archived") return "Archived";
+  if (status === "published_pending_verification") return "Verifying";
+  return `${status.slice(0, 1).toUpperCase()}${status.slice(1).replaceAll("_", " ")}`;
 }
 
 export function StoryList({
@@ -97,6 +98,7 @@ export function StoryList({
             <option value="draft">Draft</option>
             <option value="published">Published</option>
             <option value="unpublished">Unpublished</option>
+            <option value="archived">Archived</option>
           </select>
         </label>
         <label className="story-filter-field">

@@ -1,5 +1,8 @@
+import Link from "next/link";
+
 import { createStory } from "@/app/admin/cms-actions";
 import { getWorkspaceReferenceData } from "@/lib/cms/queries";
+
 export default async function NewStoryPage() {
   const { pillars } = await getWorkspaceReferenceData();
   return (
@@ -9,6 +12,9 @@ export default async function NewStoryPage() {
           <p className="workspace-eyebrow">New story</p>
           <h1>What are you exploring?</h1>
         </div>
+        <Link className="editor-action-secondary" href="/admin/stories">
+          ← Back to stories
+        </Link>
       </header>
       <form action={createStory} className="new-story-form">
         <input autoFocus name="title" placeholder="Story title" required />
@@ -23,6 +29,12 @@ export default async function NewStoryPage() {
           Start writing
         </button>
       </form>
+      <div className="new-story-import">
+        <span>or</span>
+        <Link className="editor-action-secondary" href="/admin/stories/import">
+          Import Story
+        </Link>
+      </div>
     </main>
   );
 }

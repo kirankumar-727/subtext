@@ -173,16 +173,22 @@ export async function getEditorialStructureData() {
   };
 }
 
-export async function listStories() {
+export async function listStories({ includeArchived = false } = {}) {
   await requireAdmin();
   const supabase = await createSupabaseServerClient();
-  const { data: articles, error } = await supabase
+  let query = supabase
     .from("articles")
     .select(
       "id,primary_pillar_id,status,current_draft_revision_id,published_revision_id,updated_at,first_published_at,last_published_at,canonical_path",
     )
     .order("updated_at", { ascending: false })
     .limit(250);
+
+  if (!includeArchived) {
+    query = query.neq("status", "archived");
+  }
+
+  const { data: articles, error } = await query;
   if (error) throw new Error("Stories could not be loaded");
   const revisionIds = [
     ...new Set(
