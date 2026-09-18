@@ -344,11 +344,19 @@ html {
 .workspace-shell--collapsed .workspace-sidebar__desktop-menu {
   align-items: center;
   border: 0;
-  display: flex;
+  display: flex !important;
   height: 2.35rem;
   justify-content: center;
   margin: 0 0 1.35rem;
+  opacity: 1;
+  position: relative;
+  visibility: visible;
   width: 2.35rem;
+  z-index: 2;
+}
+.workspace-shell--collapsed .workspace-sidebar__desktop-menu .workspace-nav-icon {
+  display: block;
+  flex: 0 0 auto;
 }
 .workspace-shell--collapsed .workspace-nav-link {
   justify-content: center;
@@ -2808,7 +2816,9 @@ body {
   }
 
   .workspace-shell--collapsed .workspace-sidebar__desktop-menu {
-    display: flex;
+    display: flex !important;
+    visibility: visible;
+    opacity: 1;
   }
 
   .workspace-shell--collapsed .workspace-sidebar .st-brand-mark {
