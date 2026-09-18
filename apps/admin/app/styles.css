@@ -516,6 +516,22 @@ html {
   display: grid;
   gap: 1rem;
 }
+
+.new-story-import {
+  display: grid;
+  gap: 0.65rem;
+  margin-top: 0.9rem;
+}
+
+.new-story-import > span {
+  color: var(--st-color-muted);
+  font-size: 0.7rem;
+  text-align: center;
+}
+
+.new-story-import .primary-action {
+  width: 100%;
+}
 .new-story-form input {
   border: 0;
   border-bottom: 1px solid var(--st-color-rule);

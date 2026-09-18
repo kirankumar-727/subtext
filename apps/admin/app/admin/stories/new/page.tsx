@@ -30,8 +30,8 @@ export default async function NewStoryPage() {
         </button>
       </form>
       <div className="new-story-import">
-        <span>or</span>
-        <Link className="editor-action-secondary" href="/admin/stories/import">
+        <span>Or</span>
+        <Link className="primary-action" href="/admin/stories/import">
           Import Story
         </Link>
       </div>
