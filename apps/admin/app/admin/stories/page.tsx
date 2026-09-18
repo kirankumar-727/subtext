@@ -7,7 +7,7 @@ type StoriesPageProps = Readonly<{
   searchParams?: Promise<{ status?: string | string[] }>;
 }>;
 
-const supportedStatuses = new Set(["draft", "published", "unpublished"]);
+const supportedStatuses = new Set(["draft", "published", "unpublished", "archived"]);
 
 export default async function StoriesPage({ searchParams }: StoriesPageProps) {
   const stories = await listStories();

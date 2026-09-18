@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@subtext/content": "*",
     "@subtext/env": "*",
     "@subtext/supabase": "*",
     "@subtext/ui": "*",
@@ -19,7 +20,6 @@
     "react": "19.2.8",
     "react-dom": "19.2.8",
     "server-only": "0.0.1",
-    "@subtext/content": "*",
     "sharp": "0.35.3",
     "zod": "4.4.3"
   },

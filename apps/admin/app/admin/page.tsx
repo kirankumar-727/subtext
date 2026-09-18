@@ -12,9 +12,10 @@ function formatDate(value: string | null) {
 }
 
 function statusLabel(status: string) {
-  return status === "unpublished"
-    ? "Unpublished"
-    : `${status.slice(0, 1).toUpperCase()}${status.slice(1).replaceAll("_", " ")}`;
+  if (status === "unpublished") return "Unpublished";
+  if (status === "archived") return "Archived";
+  if (status === "published_pending_verification") return "Verifying";
+  return `${status.slice(0, 1).toUpperCase()}${status.slice(1).replaceAll("_", " ")}`;
 }
 
 function EditorialStoryRow({

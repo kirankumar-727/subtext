@@ -4,12 +4,13 @@
 import { deriveContentMetrics, MarkdownRenderer } from "@subtext/content";
 import "@subtext/content/styles.css";
 import { getSupabaseBrowserClient } from "@subtext/supabase/browser";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   createMediaUploadIntent,
   createSourceInline,
   createTag,
+  deleteStoryDraft,
   finalizeMediaUpload,
   requestStoryPublication,
   saveStoryDraft,
@@ -89,6 +90,7 @@ export function StoryEditor({
   const [moreActionsOpen, setMoreActionsOpen] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const [conflict, setConflict] = useState<DraftConflict | null>(null);
   const saveAfterConflict = useRef(false);
 
@@ -120,6 +122,7 @@ export function StoryEditor({
   const [uploadRights, setUploadRights] = useState("owned");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const moreActionsRef = useRef<HTMLDivElement>(null);
+  const router = useRouter();
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inFlight = useRef(false);
@@ -556,6 +559,56 @@ export function StoryEditor({
     }
   }
 
+  async function handleDelete() {
+    const isPublished = Boolean(story.article.published_revision_id);
+    if (isPublished) {
+      setMessageType("error");
+      setMessage("A published story cannot be deleted. Unpublish it first.");
+      return;
+    }
+
+    const confirmed = window.confirm(
+      `Delete "${draft.title}"? This will archive the story and remove it from the active library. This action cannot be undone easily.`,
+    );
+    if (!confirmed) return;
+
+    setIsDeleting(true);
+    try {
+      const result = await deleteStoryDraft({ articleId: draft.articleId });
+      if (result.ok) {
+        try {
+          localStorage.removeItem(storageKey);
+        } catch {
+          // Ignore localStorage access errors
+        }
+        router.push("/admin/stories");
+      } else {
+        setMessageType("error");
+        setMessage(result.message);
+      }
+    } catch {
+      setMessageType("error");
+      setMessage("Failed to delete the story. Please try again.");
+    } finally {
+      setIsDeleting(false);
+    }
+  }
+
+  function handleCancel() {
+    if (status === "unsaved") {
+      const confirmed = window.confirm(
+        "You have unsaved changes. Are you sure you want to leave this story?",
+      );
+      if (!confirmed) return;
+    }
+    try {
+      localStorage.removeItem(storageKey);
+    } catch {
+      // Ignore localStorage access errors
+    }
+    router.push("/admin/stories");
+  }
+
   const categories = useMemo(
     () => reference.categories.filter((category) => category.pillar_id === draft.pillarId),
     [reference.categories, draft.pillarId],
@@ -605,9 +658,13 @@ export function StoryEditor({
     <main className={`editor-page${focusMode ? " editor-page--focus" : ""}`}>
       <header className="editor-topbar">
         <div className="editor-context">
-          <Link className="editor-back" href="/admin/stories">
+          <button
+            className="editor-back"
+            onClick={handleCancel}
+            type="button"
+          >
             <span aria-hidden="true">←</span> Stories
-          </Link>
+          </button>
           <span aria-hidden="true" className="editor-breadcrumb-divider">
             /
           </span>
@@ -714,6 +771,19 @@ export function StoryEditor({
                   type="button"
                 >
                   Open revision history
+                </button>
+                <button
+                  onClick={() => void handleDelete()}
+                  disabled={isDeleting || Boolean(story.article.published_revision_id)}
+                  role="menuitem"
+                  type="button"
+                  title={
+                    story.article.published_revision_id
+                      ? "Unpublish the story first before deleting"
+                      : "Delete this story"
+                  }
+                >
+                  {isDeleting ? "Deleting…" : "Delete story"}
                 </button>
               </div>
             ) : null}
