@@ -12,6 +12,7 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/authorization";
 import { isSupportedImageUpload, mediaUploadRequestSchema, safeFilename } from "@/lib/cms/media";
 import type { MediaItem, SourceItem, SourceType, StoryDraftInput, TagItem } from "@/lib/cms/types";
+import type { ImportPreview } from "@/lib/cms/story-package-import";
 import { dispatchPublishingWorker } from "@/lib/publishing/dispatch";
 import {
   createCategorySchema,
@@ -781,11 +782,7 @@ export async function validateStoryPackage(
 ): Promise<
   | {
       ok: true;
-      preview: Awaited<
-        ReturnType<
-          typeof import("@/lib/cms/story-package-import").generateImportPreview
-        >
-      >;
+      preview: ImportPreview;
       packageJson: string;
     }
   | {
