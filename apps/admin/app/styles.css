@@ -338,11 +338,17 @@ html {
 .workspace-shell--collapsed .workspace-sidebar__topline {
   justify-content: center;
 }
-.workspace-shell--collapsed .workspace-sidebar .st-brand-mark__word {
-  font-size: 0;
+.workspace-shell--collapsed .workspace-sidebar .st-brand-mark {
+  display: none;
 }
-.workspace-shell--collapsed .workspace-sidebar .st-brand-mark__word::first-letter {
-  font-size: 1.35rem;
+.workspace-shell--collapsed .workspace-sidebar__desktop-menu {
+  align-items: center;
+  border: 0;
+  display: flex;
+  height: 2.35rem;
+  justify-content: center;
+  margin: 0 0 1.35rem;
+  width: 2.35rem;
 }
 .workspace-shell--collapsed .workspace-nav-link {
   justify-content: center;
@@ -2798,6 +2804,14 @@ body {
   }
 
   .workspace-sidebar__desktop-menu {
+    display: none;
+  }
+
+  .workspace-shell--collapsed .workspace-sidebar__desktop-menu {
+    display: flex;
+  }
+
+  .workspace-shell--collapsed .workspace-sidebar .st-brand-mark {
     display: none;
   }
 
