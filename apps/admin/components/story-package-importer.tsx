@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useCallback, useRef, useState } from "react";
 
 import { validateStoryPackage, importStoryPackage } from "@/app/admin/cms-actions";
@@ -27,12 +26,9 @@ type ImportPreview = {
 type ImportStep = "upload" | "validating" | "preview" | "importing" | "success" | "error";
 
 export function StoryPackageImporter() {
-  const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [step, setStep] = useState<ImportStep>("upload");
-  const [fileName, setFileName] = useState("");
-  const [fileSize, setFileSize] = useState(0);
   const [preview, setPreview] = useState<ImportPreview | null>(null);
   const [packageJson, setPackageJson] = useState<string | null>(null);
   const [zipBytes, setZipBytes] = useState<Uint8Array | null>(null);
@@ -60,8 +56,6 @@ export function StoryPackageImporter() {
     setPackageJson(null);
     setZipBytes(null);
     setCreatedArticleId(null);
-    setFileName(file.name);
-    setFileSize(file.size);
 
     // Client-side size check
     if (file.size > MAX_BYTES) {
@@ -173,8 +167,6 @@ export function StoryPackageImporter() {
     setValidationWarnings([]);
     setImportErrors([]);
     setCreatedArticleId(null);
-    setFileName("");
-    setFileSize(0);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
 

@@ -12,6 +12,7 @@ import { z } from "zod";
 import { requireAdmin } from "@/lib/auth/authorization";
 import { isSupportedImageUpload, mediaUploadRequestSchema, safeFilename } from "@/lib/cms/media";
 import type { MediaItem, SourceItem, SourceType, StoryDraftInput, TagItem } from "@/lib/cms/types";
+import type { ImportPreview } from "@/lib/cms/story-package-import";
 import { dispatchPublishingWorker } from "@/lib/publishing/dispatch";
 import {
   createCategorySchema,
@@ -746,7 +747,11 @@ export async function deleteStoryDraft(input: { articleId: string }) {
     };
   }
 
-  if (article.status === "publishing" || article.status === "scheduled" || article.status === "published_pending_verification") {
+  if (
+    article.status === "publishing" ||
+    article.status === "scheduled" ||
+    article.status === "published_pending_verification"
+  ) {
     return {
       ok: false as const,
       message:
@@ -775,8 +780,16 @@ export async function deleteStoryDraft(input: { articleId: string }) {
 export async function validateStoryPackage(
   zipBytes: Uint8Array,
 ): Promise<
-  | { ok: true; preview: Awaited<ReturnType<typeof import("@/lib/cms/story-package-import").generateImportPreview>>; packageJson: string }
-  | { ok: false; errors: Array<{ code: string; level: "error" | "warning"; message: string }>; warnings: Array<{ code: string; level: "error" | "warning"; message: string }> }
+  | {
+      ok: true;
+      preview: ImportPreview;
+      packageJson: string;
+    }
+  | {
+      ok: false;
+      errors: Array<{ code: string; level: "error" | "warning"; message: string }>;
+      warnings: Array<{ code: string; level: "error" | "warning"; message: string }>;
+    }
 > {
   await requireAdmin();
 
@@ -829,7 +842,10 @@ export async function importStoryPackage(
   if (!parseResult.ok) {
     return {
       ok: false,
-      errors: parseResult.errors.map((e) => ({ code: e.code, message: e.message })),
+      errors: parseResult.errors.map((e) => ({
+        code: e.code,
+        message: e.message,
+      })),
     };
   }
 
@@ -889,7 +905,11 @@ export async function importStoryPackage(
   if (result.ok) {
     revalidatePath("/admin/stories");
     revalidatePath(`/admin/stories/${result.articleId}`);
-    return { ok: true, articleId: result.articleId, coverMediaAssetId: result.coverMediaAssetId };
+    return {
+      ok: true,
+      articleId: result.articleId,
+      coverMediaAssetId: result.coverMediaAssetId,
+    };
   }
 
   return { ok: false, errors: result.errors };
