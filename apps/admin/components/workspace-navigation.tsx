@@ -114,8 +114,10 @@ function NavigationIcon({ name }: { name: IconName }) {
   if (name === "pillars") {
     return (
       <svg {...commonProps}>
-        <path d="M5 6.5 12 3l7 3.5-7 3.5z" />
-        <path d="m5 11 7 3.5 7-3.5M5 15.5l7 3.5 7-3.5" />
+        <path d="M4 3.5h16M5 5.5h14" />
+        <path d="M6.5 7.5c0-1.1.9-2 2-2s2 .9 2 2c0 1.1-.9 2-2 2s-2-.9-2-2Zm11 0c0-1.1-.9-2-2-2s-2 .9-2 2c0 1.1.9 2 2 2s2-.9 2-2Z" />
+        <path d="M7.5 9.5v9M10.5 9.5v9M13.5 9.5v9M16.5 9.5v9" />
+        <path d="M5 18.5h14M4 20.5h16" />
       </svg>
     );
   }
