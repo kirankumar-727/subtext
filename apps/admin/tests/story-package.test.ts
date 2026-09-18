@@ -1,5 +1,4 @@
-import { createHash } from "node:crypto";
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 
 import {
   parseFrontmatter,
@@ -286,7 +285,7 @@ describe("story package ZIP validation", () => {
     if (!result.ok) return;
     expect(result.pkg.storyMarkdown).toContain("## Introduction");
     expect(result.pkg.images).toHaveLength(1);
-    expect(result.pkg.images[0]!!.archivePath).toBe("images/cover.jpg");
+    expect(result.pkg.images[0]!.archivePath).toBe("images/cover.jpg");
   });
 
   // 2. ZIP > 250 KB
@@ -296,8 +295,8 @@ describe("story package ZIP validation", () => {
     const result = await parseStoryPackage(zip);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.errors[0]!!.code).toBe("package_too_large");
-    expect(result.errors[0]!!.message).toContain("250 KB");
+    expect(result.errors[0]!.code).toBe("package_too_large");
+    expect(result.errors[0]!.message).toContain("250 KB");
   });
 
   // 3. Missing story.md
@@ -452,7 +451,7 @@ Body.`;
     const result = await parseStoryPackage(zip);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.errors[0]!!.code).toBe("unsafe_path");
+    expect(result.errors[0]!.code).toBe("unsafe_path");
   });
 
   it("rejects packages with absolute paths", async () => {
@@ -462,7 +461,7 @@ Body.`;
     const result = await parseStoryPackage(zip);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.errors[0]!!.code).toBe("unsafe_path");
+    expect(result.errors[0]!.code).toBe("unsafe_path");
   });
 
   // 11. Corrupted ZIP
@@ -471,7 +470,7 @@ Body.`;
     const result = await parseStoryPackage(corrupted);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.errors[0]!!.code).toBe("corrupted_zip");
+    expect(result.errors[0]!.code).toBe("corrupted_zip");
   });
 
   // 12. Valid Markdown-only import
@@ -552,7 +551,7 @@ author: "An Author"
     const result = await parseStoryPackage(zip);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.errors[0]!!.code).toBe("empty_package");
+    expect(result.errors[0]!.code).toBe("empty_package");
   });
 });
 
@@ -645,8 +644,8 @@ describe("package size enforcement", () => {
     const result = await parseStoryPackage(oversize);
     expect(result.ok).toBe(false);
     if (result.ok) return;
-    expect(result.errors[0]!!.code).toBe("package_too_large");
-    expect(result.errors[0]!!.message).toContain("250 KB");
+    expect(result.errors[0]!.code).toBe("package_too_large");
+    expect(result.errors[0]!.message).toContain("250 KB");
   });
 
   it("reports the actual size in the error message", async () => {
@@ -656,7 +655,7 @@ describe("package size enforcement", () => {
     expect(result.ok).toBe(false);
     if (result.ok) return;
     // The error should mention the size
-    expect(result.errors[0]!!.message).toMatch(/\d+(\.\d+)? KB/);
+    expect(result.errors[0]!.message).toMatch(/\d+(\.\d+)? KB/);
   });
 });
 
