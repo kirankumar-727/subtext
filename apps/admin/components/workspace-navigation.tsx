@@ -365,7 +365,7 @@ export function WorkspaceNavigation({ children, counts, logout }: WorkspaceNavig
           ref={menuButtonRef}
           type="button"
         >
-          <NavigationIcon name="menu" />
+          <NavigationIcon name="sidebar" />
         </button>
         <div className="workspace-mobile-header__context">
           <BrandMark compact href="/admin" onClick={closeDrawer} />
