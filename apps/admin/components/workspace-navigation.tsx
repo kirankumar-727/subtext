@@ -35,6 +35,9 @@ type IconName =
   | "trash"
   | "profile"
   | "help"
+  | "pillars"
+  | "categories"
+  | "tags"
   | "logout"
   | "menu"
   | "close"
@@ -57,9 +60,9 @@ const navigationItems: NavigationItem[] = [
 ];
 
 const editorialItems: NavigationItem[] = [
-  { href: "/admin/pillars", icon: "stories", label: "Pillars" },
-  { href: "/admin/categories", icon: "stories", label: "Categories" },
-  { href: "/admin/tags", icon: "stories", label: "Tags" },
+  { href: "/admin/pillars", icon: "pillars", label: "Pillars" },
+  { href: "/admin/categories", icon: "categories", label: "Categories" },
+  { href: "/admin/tags", icon: "tags", label: "Tags" },
   { href: "/admin/authors", icon: "profile", label: "Authors" },
 ];
 
@@ -104,6 +107,35 @@ function NavigationIcon({ name }: { name: IconName }) {
       <svg {...commonProps}>
         <path d="M6 3.5h8.2L18 7.3v13.2H6z" />
         <path d="M14 3.5v4h4M9 11h6M9 14.5h6M9 18h3.5" />
+      </svg>
+    );
+  }
+
+  if (name === "pillars") {
+    return (
+      <svg {...commonProps}>
+        <path d="M5 6.5 12 3l7 3.5-7 3.5z" />
+        <path d="m5 11 7 3.5 7-3.5M5 15.5l7 3.5 7-3.5" />
+      </svg>
+    );
+  }
+
+  if (name === "categories") {
+    return (
+      <svg {...commonProps}>
+        <rect height="6.5" rx="1" width="6.5" x="4" y="4" />
+        <rect height="6.5" rx="1" width="6.5" x="13.5" y="4" />
+        <rect height="6.5" rx="1" width="6.5" x="4" y="13.5" />
+        <rect height="6.5" rx="1" width="6.5" x="13.5" y="13.5" />
+      </svg>
+    );
+  }
+
+  if (name === "tags") {
+    return (
+      <svg {...commonProps}>
+        <path d="M4 5.5v6l8.5 8.5 7-7L11 4.5H5a1 1 0 0 0-1 1Z" />
+        <circle cx="8" cy="8.5" r="1" />
       </svg>
     );
   }
