@@ -1,0 +1,58 @@
+name: One-off CI format repair
+
+on:
+  push:
+    branches:
+      - fix/ci-format-cms-actions
+
+permissions:
+  contents: write
+
+jobs:
+  repair:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+      TURBO_TELEMETRY_DISABLED: "1"
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+
+      - name: Install required npm version
+        run: npm install -g npm@11.19.0
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Format the failing file
+        run: npm run format -- --write apps/admin/app/admin/cms-actions.ts
+
+      - name: Commit formatting repair
+        run: |
+          if git diff --quiet -- apps/admin/app/admin/cms-actions.ts; then
+            echo "No formatting changes were required."
+          else
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add apps/admin/app/admin/cms-actions.ts
+            git commit -m "fix: format cms actions"
+            git push origin "HEAD:\${GITHUB_REF_NAME}"
+          fi
+
+      - name: Verify full quality gate
+        run: npm run check
+
+      - name: Remove one-off workflow
+        run: |
+          git rm .github/workflows/one-off-ci-format-repair.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "chore: remove one-off CI repair workflow"
+          git push origin "HEAD:\${GITHUB_REF_NAME}"
