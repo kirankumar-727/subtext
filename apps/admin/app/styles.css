@@ -219,6 +219,7 @@ html {
   grid-template-columns: var(--workspace-sidebar-width) minmax(0, 1fr);
   min-height: 100vh;
   overflow-x: clip;
+  transition: grid-template-columns 220ms cubic-bezier(0.2, 0.75, 0.25, 1);
 }
 .workspace-shell--collapsed {
   --workspace-sidebar-width: 4.5rem;
@@ -242,6 +243,22 @@ html {
   top: 0;
   z-index: 20;
 }
+
+.workspace-sidebar {
+  transition: padding 220ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.workspace-sidebar__topline,
+.workspace-new-story,
+.workspace-nav-link,
+.workspace-sidebar__footer {
+  transition: opacity 180ms ease, transform 220ms cubic-bezier(0.2, 0.75, 0.25, 1);
+}
+
+.workspace-shell--collapsed .workspace-nav-link {
+  transform: translateX(0);
+}
+
 .workspace-sidebar__topline {
   align-items: center;
   display: flex;
