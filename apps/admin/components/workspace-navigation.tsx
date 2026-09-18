@@ -40,6 +40,7 @@ type IconName =
   | "tags"
   | "logout"
   | "menu"
+  | "sidebar"
   | "close"
   | "collapse"
   | "plus";
@@ -209,6 +210,16 @@ function NavigationIcon({ name }: { name: IconName }) {
     return (
       <svg {...commonProps}>
         <path d="M14 4H5.5v16H14M10.5 12h10M16.5 8l4 4-4 4" />
+      </svg>
+    );
+  }
+
+  if (name === "sidebar") {
+    return (
+      <svg {...commonProps}>
+        <rect height="17" rx="3" width="17" x="3.5" y="3.5" />
+        <path d="M9 3.5v17" />
+        <path d="m7.5 9.5-2.5 2.5 2.5 2.5" />
       </svg>
     );
   }
@@ -400,7 +411,7 @@ export function WorkspaceNavigation({ children, counts, logout }: WorkspaceNavig
             title={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
             type="button"
           >
-            <NavigationIcon name="menu" />
+            <NavigationIcon name="sidebar" />
           </button>
           <button
             aria-label="Close navigation"

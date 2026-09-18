@@ -5973,3 +5973,25 @@ summary:focus-visible {
     text-align: left;
   }
 }
+
+.workspace-shell--collapsed .workspace-sidebar__desktop-menu {
+  align-items: center;
+  background: transparent;
+  border: 0;
+  color: var(--workspace-sidebar-text);
+  display: flex !important;
+  height: 2.35rem;
+  justify-content: center;
+  margin: 0 0 1.35rem;
+  opacity: 1 !important;
+  padding: 0;
+  position: relative;
+  visibility: visible !important;
+  width: 2.35rem;
+  z-index: 2;
+}
+
+.workspace-shell--collapsed .workspace-sidebar__desktop-menu:hover {
+  background: transparent;
+  color: var(--workspace-sidebar-text);
+}
