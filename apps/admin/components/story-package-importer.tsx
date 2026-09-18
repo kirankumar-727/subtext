@@ -167,8 +167,6 @@ export function StoryPackageImporter() {
     setValidationWarnings([]);
     setImportErrors([]);
     setCreatedArticleId(null);
-    setFileName("");
-    setFileSize(0);
     if (fileInputRef.current) fileInputRef.current.value = "";
   }, []);
 
