@@ -746,7 +746,11 @@ export async function deleteStoryDraft(input: { articleId: string }) {
     };
   }
 
-  if (article.status === "publishing" || article.status === "scheduled" || article.status === "published_pending_verification") {
+  if (
+    article.status === "publishing" ||
+    article.status === "scheduled" ||
+    article.status === "published_pending_verification"
+  ) {
     return {
       ok: false as const,
       message:
@@ -775,8 +779,18 @@ export async function deleteStoryDraft(input: { articleId: string }) {
 export async function validateStoryPackage(
   zipBytes: Uint8Array,
 ): Promise<
-  | { ok: true; preview: Awaited<ReturnType<typeof import("@/lib/cms/story-package-import").generateImportPreview>>; packageJson: string }
-  | { ok: false; errors: Array<{ code: string; level: "error" | "warning"; message: string }>; warnings: Array<{ code: string; level: "error" | "warning"; message: string }> }
+  | {
+      ok: true;
+      preview: Awaited<
+        ReturnType<typeof import("@/lib/cms/story-package-import").generateImportPreview>
+      >;
+      packageJson: string;
+    }
+  | {
+      ok: false;
+      errors: Array<{ code: string; level: "error" | "warning"; message: string }>;
+      warnings: Array<{ code: string; level: "error" | "warning"; message: string }>;
+    }
 > {
   await requireAdmin();
 
@@ -862,9 +876,7 @@ export async function importStoryPackage(
   };
 
   // Reconstruct the package using re-parsed image data from the ZIP
-  const parsedImagesByPath = new Map(
-    parseResult.pkg.images.map((img) => [img.archivePath, img]),
-  );
+  const parsedImagesByPath = new Map(parseResult.pkg.images.map((img) => [img.archivePath, img]));
 
   const pkg = {
     storyMarkdown: raw.storyMarkdown,
