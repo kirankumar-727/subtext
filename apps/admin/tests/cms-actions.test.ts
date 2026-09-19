@@ -2,7 +2,28 @@ import { createHash } from "node:crypto";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const requireAdminMock = vi.hoisted(() => vi.fn());
+const requireAdminMock = vi.hoisted(() => vi.fn());
 const createSupabaseServerClientMock = vi.hoisted(() => vi.fn());
+
+vi.mock("@/lib/cms/media-processing", () => ({
+  processMediaAsset: vi.fn().mockResolvedValue({
+    id: "processed-media",
+    kind: "image",
+    original_filename: "processed.jpg",
+    mime_type: "image/jpeg",
+    byte_size: 1,
+    default_alt_text: "processed",
+    default_caption: null,
+    credit_text: null,
+    rights_status: "unknown",
+    processing_status: "ready",
+    created_at: "2026-01-01T00:00:00Z",
+    publicUrl: "https://example.com/processed.webp",
+    hasPublicVariant: true,
+    width: 640,
+    height: 360,
+  }),
+}));
 const revalidatePathMock = vi.hoisted(() => vi.fn());
 const afterMock = vi.hoisted(() => vi.fn());
 const redirectMock = vi.hoisted(() => vi.fn());
