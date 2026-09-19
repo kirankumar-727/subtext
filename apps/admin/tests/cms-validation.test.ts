@@ -39,6 +39,7 @@ const draft: StoryDraftInput = {
   tagIds: [],
   sourceIds: [],
   coverMediaAssetId: null,
+  mediaAssetIds: [],
   seoTitle: "",
   seoDescription: "",
 };
