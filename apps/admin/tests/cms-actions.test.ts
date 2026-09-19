@@ -148,6 +148,7 @@ describe("saveStoryDraft conflict handling", () => {
       tagIds: [],
       sourceIds: [],
       coverMediaAssetId: null,
+      mediaAssetIds: [],
       seoTitle: "",
       seoDescription: "",
     };
