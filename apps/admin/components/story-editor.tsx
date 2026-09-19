@@ -1251,13 +1251,16 @@ export function StoryEditor({
                           aria-pressed={isSelected}
                           className={`${isSelected ? "is-selected" : ""}${!isSelectable ? " is-unavailable" : ""}`}
                           disabled={!isSelectable}
-                          onClick={() =>
-                            update(
-                              "mediaAssetIds",
-                              isSelected
-                                ? draft.mediaAssetIds.filter((id) => id !== asset.id)
-                                : [...draft.mediaAssetIds, asset.id],
-                            )
+                          onClick={() => {
+                            if (isSelected) {
+                              update(
+                                "mediaAssetIds",
+                                draft.mediaAssetIds.filter((id) => id !== asset.id),
+                              );
+                              if (isCover) update("coverMediaAssetId", null);
+                            } else {
+                              update("mediaAssetIds", [...draft.mediaAssetIds, asset.id]);
+                            }
                           }
                           title={
                             isSelectable
