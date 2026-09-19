@@ -14,6 +14,7 @@ export type StoryDraftInput = {
   tagIds: string[];
   sourceIds: string[];
   coverMediaAssetId: string | null;
+  mediaAssetIds: string[];
   seoTitle: string;
   seoDescription: string;
 };
