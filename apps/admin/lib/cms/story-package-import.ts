@@ -536,6 +536,44 @@ export async function executeStoryImport(
       };
       const mimeType = mimeMap[img.extension] ?? "application/octet-stream";
 
+      // Reuse an existing asset when the exact bytes are already in the media library.
+      // Story-package retries must be idempotent: media_assets has a unique
+      // (checksum_sha256, byte_size) index, and the original import may have
+      // already created a pending asset before the retry.
+      const { data: existingAsset } = await supabase
+        .from("media_assets")
+        .select("id,processing_status")
+        .eq("checksum_sha256", checksumSha256)
+        .eq("byte_size", img.data.byteLength)
+        .maybeSingle();
+
+      if (existingAsset) {
+        if (existingAsset.processing_status === "pending") {
+          await processMediaAsset(supabase, existingAsset.id);
+        } else if (existingAsset.processing_status === "failed") {
+          errors.push({
+            code: "media_processing_failed",
+            message: `Existing media asset for "${filename}" is marked failed and could not be reused.`,
+          });
+          continue;
+        }
+
+        const coverRef = typeof fm.cover === "string" ? fm.cover : null;
+        const isCover =
+          coverRef === img.archivePath ||
+          coverRef === filename ||
+          coverRef === `images/${filename}`;
+
+        mediaPlacements.push({
+          mediaAssetId: existingAsset.id,
+          altText,
+          caption,
+          credit,
+          isCover,
+        });
+        continue;
+      }
+
       const originalKey = `${mediaAssetId}/original-${safeFilename(filename)}`;
 
       // Upload original to storage
