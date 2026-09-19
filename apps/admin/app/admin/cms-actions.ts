@@ -157,8 +157,6 @@ export async function saveStoryDraft(input: StoryDraftInput) {
     p_seo_description: draft.seoDescription,
     p_word_count: metrics.wordCount,
     p_reading_time_minutes: metrics.readingTimeMinutes,
-    p_citation_options: [],
-    p_media_placements: [],
   });
 
   if (error || !data?.[0]) {
