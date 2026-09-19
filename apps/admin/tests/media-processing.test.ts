@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import { describe, expect, it, vi } from "vitest";
 
 import { processMediaAsset } from "@/lib/cms/media-processing";
@@ -30,10 +31,7 @@ describe("processMediaAsset", () => {
             kind: "image",
             original_filename: "cover.png",
             original_storage_key: "media-001/original-cover.png",
-            checksum_sha256: require("node:crypto")
-              .createHash("sha256")
-              .update(ONE_PIXEL_PNG)
-              .digest("hex"),
+            checksum_sha256: createHash("sha256").update(ONE_PIXEL_PNG).digest("hex"),
             mime_type: "image/png",
             byte_size: ONE_PIXEL_PNG.byteLength,
             default_alt_text: "Cover",
