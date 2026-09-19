@@ -40,7 +40,7 @@ async function readCurrentDraftForConflict(
   if (articleError || !article?.current_draft_revision_id) return null;
 
   const revisionId = article.current_draft_revision_id;
-  const [revisionResult, tagsResult, citationsResult, heroResult] = await Promise.all([
+  const [revisionResult, tagsResult, citationsResult, mediaResult] = await Promise.all([
     supabase
       .from("article_revisions")
       .select("title,dek,body_markdown,seo_title,seo_description")
@@ -54,17 +54,16 @@ async function readCurrentDraftForConflict(
       .order("ordinal"),
     supabase
       .from("article_media")
-      .select("media_asset_id")
+      .select("media_asset_id,role")
       .eq("revision_id", revisionId)
-      .eq("role", "hero")
-      .maybeSingle(),
+      .order("position"),
   ]);
 
   if (
     revisionResult.error ||
     tagsResult.error ||
     citationsResult.error ||
-    heroResult.error ||
+    mediaResult.error ||
     !revisionResult.data
   ) {
     return null;
@@ -81,7 +80,9 @@ async function readCurrentDraftForConflict(
     categoryId: article.category_id,
     tagIds: (tagsResult.data ?? []).map((row) => row.tag_id),
     sourceIds: (citationsResult.data ?? []).map((row) => row.source_id),
-    coverMediaAssetId: heroResult.data?.media_asset_id ?? null,
+    coverMediaAssetId:
+      (mediaResult.data ?? []).find((row) => row.role === "hero")?.media_asset_id ?? null,
+    mediaAssetIds: (mediaResult.data ?? []).map((row) => row.media_asset_id),
     seoTitle: revisionResult.data.seo_title ?? "",
     seoDescription: revisionResult.data.seo_description ?? "",
   };
@@ -153,6 +154,7 @@ export async function saveStoryDraft(input: StoryDraftInput) {
     p_tag_ids: draft.tagIds,
     p_source_ids: draft.sourceIds,
     p_cover_media_asset_id: draft.coverMediaAssetId,
+    p_media_asset_ids: draft.mediaAssetIds,
     p_seo_title: draft.seoTitle,
     p_seo_description: draft.seoDescription,
     p_word_count: metrics.wordCount,

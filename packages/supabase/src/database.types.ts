@@ -1392,6 +1392,7 @@ export type Database = {
           p_tag_ids: string[];
           p_source_ids: string[];
           p_cover_media_asset_id: string | null;
+          p_media_asset_ids: string[];
           p_seo_title: string;
           p_seo_description: string;
           p_word_count: number;

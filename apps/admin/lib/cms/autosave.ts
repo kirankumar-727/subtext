@@ -20,6 +20,7 @@ export function serializeDraftContent(draft: StoryDraftInput): string {
     tagIds: draft.tagIds,
     sourceIds: draft.sourceIds,
     coverMediaAssetId: draft.coverMediaAssetId,
+    mediaAssetIds: draft.mediaAssetIds,
     seoTitle: draft.seoTitle,
     seoDescription: draft.seoDescription,
   });

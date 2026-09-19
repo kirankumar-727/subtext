@@ -878,6 +878,28 @@ html {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+.media-picker-item {
+  display: grid;
+  gap: 0.2rem;
+  min-width: 0;
+}
+.media-picker-item > button:first-child {
+  min-width: 0;
+  width: 100%;
+}
+.media-picker-item > button:first-child.is-selected {
+  border-color: var(--st-color-accent);
+  box-shadow: inset 0 0 0 1px var(--st-color-accent);
+}
+.media-cover-btn {
+  font-size: 0.58rem;
+  min-height: 1.5rem;
+  padding: 0.2rem 0.35rem;
+}
+.media-cover-btn.is-selected {
+  background: var(--st-color-accent);
+  color: var(--st-color-paper);
+}
 .field-hint {
   color: var(--st-color-muted);
   font-size: 0.65rem;

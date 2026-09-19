@@ -76,6 +76,7 @@ export function StoryEditor({
     tagIds: story.tagIds,
     sourceIds: story.sourceIds,
     coverMediaAssetId: story.coverMediaAssetId,
+    mediaAssetIds: story.mediaAssetIds,
     seoTitle: revision?.seo_title ?? "",
     seoDescription: revision?.seo_description ?? "",
   });
@@ -461,6 +462,7 @@ export function StoryEditor({
             ...prev.media.filter((m) => m.id !== createdMedia.id),
           ] as MediaItem[],
         }));
+        update("mediaAssetIds", [...new Set([...latestDraft.current.mediaAssetIds, createdMedia.id])]);
         update("coverMediaAssetId", createdMedia.id);
         setUploadStatus("complete");
         setShowMediaUpload(false);
@@ -1234,39 +1236,63 @@ export function StoryEditor({
                   </form>
                 ) : null}
 
-                <h4 className="sub-heading">Choose from Media Library</h4>
+                <h4 className="sub-heading">Story Media</h4>
+                <p className="field-hint">
+                  Select every image this story should carry. The cover is separate and can be changed anytime.
+                </p>
                 <div className="media-picker">
-                  <button
-                    className={!draft.coverMediaAssetId ? "is-selected" : ""}
-                    onClick={() => update("coverMediaAssetId", null)}
-                    type="button"
-                  >
-                    None
-                  </button>
                   {reference.media.map((asset) => {
-                    const isSelectable = asset.processing_status === "ready";
+                    const isSelectable = asset.processing_status === "ready" && Boolean(asset.publicUrl);
+                    const isSelected = draft.mediaAssetIds.includes(asset.id);
+                    const isCover = draft.coverMediaAssetId === asset.id;
                     return (
-                      <button
-                        className={`${draft.coverMediaAssetId === asset.id ? "is-selected" : ""}${!isSelectable ? " is-unavailable" : ""}`}
-                        disabled={!isSelectable}
-                        key={asset.id}
-                        onClick={() => update("coverMediaAssetId", asset.id)}
-                        title={
-                          isSelectable
-                            ? asset.original_filename
-                            : `${asset.original_filename} is ${asset.processing_status}; wait until it is ready`
-                        }
-                        type="button"
-                      >
-                        {asset.publicUrl ? (
-                          <img alt={asset.default_alt_text ?? ""} src={asset.publicUrl} />
+                      <div className={`media-picker-item${isSelected ? " is-selected" : ""}`} key={asset.id}>
+                        <button
+                          aria-pressed={isSelected}
+                          className={`${isSelected ? "is-selected" : ""}${!isSelectable ? " is-unavailable" : ""}`}
+                          disabled={!isSelectable}
+                          onClick={() => {
+                            if (isSelected) {
+                              update(
+                                "mediaAssetIds",
+                                draft.mediaAssetIds.filter((id) => id !== asset.id),
+                              );
+                              if (isCover) update("coverMediaAssetId", null);
+                            } else {
+                              update("mediaAssetIds", [...draft.mediaAssetIds, asset.id]);
+                            }
+                          }
+                          title={
+                            isSelectable
+                              ? (isSelected ? `Remove ${asset.original_filename}` : `Add ${asset.original_filename}`)
+                              : `${asset.original_filename} is ${asset.processing_status}; wait until it is ready`
+                          }
+                          type="button"
+                        >
+                          {asset.publicUrl ? (
+                            <img alt={asset.default_alt_text ?? ""} src={asset.publicUrl} />
+                          ) : null}
+                          <span>{isSelected ? "✓ " : ""}{asset.original_filename}</span>
+                          {!isSelectable ? <small>{asset.processing_status}</small> : null}
+                        </button>
+                        {isSelectable ? (
+                          <button
+                            className={`media-cover-btn${isCover ? " is-selected" : ""}`}
+                            disabled={!isSelected}
+                            onClick={() => update("coverMediaAssetId", isCover ? null : asset.id)}
+                            type="button"
+                          >
+                            {isCover ? "Cover" : "Set as cover"}
+                          </button>
                         ) : null}
-                        <span>{asset.original_filename}</span>
-                        {!isSelectable ? <small>{asset.processing_status}</small> : null}
-                      </button>
+                      </div>
                     );
                   })}
                 </div>
+                <p className="field-hint">
+                  {draft.mediaAssetIds.length} image{draft.mediaAssetIds.length === 1 ? "" : "s"} selected
+                  {draft.coverMediaAssetId ? " · 1 cover" : ""}.
+                </p>
 
                 {selectedCover?.publicUrl ? (
                   <button
