@@ -1392,6 +1392,32 @@ export type Database = {
           p_tag_ids: string[];
           p_source_ids: string[];
           p_cover_media_asset_id: string | null;
+          p_seo_title: string;
+          p_seo_description: string;
+          p_word_count: number;
+          p_reading_time_minutes: number;
+        };
+        Returns: {
+          article_id: string;
+          revision_id: string;
+          row_version: number;
+          saved_at: string;
+        }[];
+      };
+      save_story_draft_with_media: {
+        Args: {
+          p_article_id: string;
+          p_expected_row_version: number;
+          p_title: string;
+          p_slug: string;
+          p_excerpt: string;
+          p_body_markdown: string;
+          p_body_plain_text: string;
+          p_pillar_id: string;
+          p_category_id: string | null;
+          p_tag_ids: string[];
+          p_source_ids: string[];
+          p_cover_media_asset_id: string | null;
           p_media_asset_ids: string[];
           p_seo_title: string;
           p_seo_description: string;
