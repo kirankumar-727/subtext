@@ -127,7 +127,7 @@ describe("saveStoryDraft conflict handling", () => {
             error: null,
           },
           article_media: {
-            data: { media_asset_id: "90000000-0000-4000-8000-000000000006" },
+            data: [{ media_asset_id: "90000000-0000-4000-8000-000000000006", role: "hero" }],
             error: null,
           },
         };
@@ -148,6 +148,7 @@ describe("saveStoryDraft conflict handling", () => {
       tagIds: [],
       sourceIds: [],
       coverMediaAssetId: null,
+      mediaAssetIds: [],
       seoTitle: "",
       seoDescription: "",
     };
