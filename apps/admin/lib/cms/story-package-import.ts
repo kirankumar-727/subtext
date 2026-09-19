@@ -476,8 +476,6 @@ export async function executeStoryImport(
       p_seo_description: seoDescription,
       p_word_count: metrics.wordCount,
       p_reading_time_minutes: metrics.readingTimeMinutes,
-      p_citation_options: [],
-      p_media_placements: [],
     });
 
     if (saveError || !saveResult?.[0]) {
