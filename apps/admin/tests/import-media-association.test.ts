@@ -12,6 +12,26 @@ import { describe, expect, it, vi, beforeEach } from "vitest";
 const requireAdminMock = vi.hoisted(() => vi.fn());
 const createSupabaseServerClientMock = vi.hoisted(() => vi.fn());
 
+vi.mock(import("@/lib/cms/media-processing"), () => ({
+  processMediaAsset: vi.fn().mockResolvedValue({
+    id: "processed-media",
+    kind: "image",
+    original_filename: "processed.jpg",
+    mime_type: "image/jpeg",
+    byte_size: 1,
+    default_alt_text: "processed",
+    default_caption: null,
+    credit_text: null,
+    rights_status: "unknown",
+    processing_status: "ready",
+    created_at: "2026-01-01T00:00:00Z",
+    publicUrl: "https://example.com/processed.webp",
+    hasPublicVariant: true,
+    width: 640,
+    height: 360,
+  }),
+}));
+
 vi.mock("@/lib/auth/authorization", () => ({
   requireAdmin: requireAdminMock,
 }));
@@ -265,7 +285,7 @@ describe("import media association", () => {
     expect(positions).toEqual([0, 1]);
   });
 
-  it("never assigns pending media as hero", async () => {
+  it("assigns the processed cover as hero", async () => {
     const mock = createMock();
     createSupabaseServerClientMock.mockResolvedValue(mock.supabase);
 
@@ -274,18 +294,17 @@ describe("import media association", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    // No hero role in any article_media batch insert
     const articleMediaInserts = mock.inserts.filter(
       (i) => i.table === "article_media",
     );
-    for (const insert of articleMediaInserts) {
-      const records = Array.isArray(insert.data) ? insert.data : [insert.data];
-      for (const rec of records) {
-        expect(rec.role).not.toBe("hero");
-      }
-    }
+    const records = articleMediaInserts.flatMap((insert) =>
+      Array.isArray(insert.data) ? insert.data : [insert.data],
+    );
+    expect(records.some((record) => record.role === "hero")).toBe(true);
+    expect(records.some((record) => record.role === "inline")).toBe(true);
 
-    // save_story_draft was called with null cover
+    // The cover is assigned after save_story_draft because its media asset
+    // does not exist until the import media phase.
     const saveCalls = mock.rpcCalls.filter((c) => c.fn === "save_story_draft");
     expect(saveCalls[0]!.args.p_cover_media_asset_id).toBeNull();
   });
@@ -311,7 +330,7 @@ describe("import media association", () => {
       (r) => r.media_asset_id === result.coverMediaAssetId,
     );
     expect(coverRecord).toBeTruthy();
-    expect(coverRecord!.role).toBe("inline");
+    expect(coverRecord!.role).toBe("hero");
   });
 
   it("returns null coverMediaAssetId when no cover reference matches", async () => {
