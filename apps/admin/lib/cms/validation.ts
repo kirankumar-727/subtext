@@ -17,6 +17,7 @@ export const storyDraftSchema = z.object({
   tagIds: z.array(z.uuid()).max(30),
   sourceIds: z.array(z.uuid()).max(100),
   coverMediaAssetId: z.uuid().nullable(),
+  mediaAssetIds: z.array(z.uuid()).max(100),
   seoTitle: z.string().max(120),
   seoDescription: z.string().max(320),
 });
