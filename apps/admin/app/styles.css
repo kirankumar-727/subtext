@@ -866,6 +866,15 @@ html {
 .media-picker button.is-selected {
   border-color: var(--st-color-accent);
 }
+.media-picker button.is-cover {
+  box-shadow: inset 0 0 0 2px var(--st-color-accent);
+}
+.panel-hint {
+  color: var(--st-color-muted);
+  font-size: 0.68rem;
+  line-height: 1.45;
+  margin: 0 0 0.55rem;
+}
 .media-picker img {
   aspect-ratio: 4/3;
   object-fit: cover;
