@@ -491,8 +491,9 @@ export async function executeStoryImport(
     // This is the current draft revision that media should be linked to.
     const currentRevisionId = saveResult[0].revision_id as string;
 
-    // --- Create media asset records ---
-    // Images are stored but not processed yet (they need user to verify rights)
+    // --- Create and process media assets ---
+    // Imported media is processed immediately; rights remain an editorial
+    // gate and unresolved rights can still block publication.
     for (const img of pkg.images) {
       // Resolve image metadata from frontmatter images[] or from metadata/media.md
       const frontmatterImage = fm.images?.find(
@@ -607,15 +608,13 @@ export async function executeStoryImport(
     }
 
     // --- Link media to the current draft revision ---
-    // Insert article_media records using the existing revision-media model.
-    // All imported images are placed as 'inline' — the user assigns hero
-    // after processing. The cover reference is preserved in the placement
-    // metadata so the editor can suggest it.
+    // Processed cover media can be assigned as the hero immediately. All
+    // other imported media remains inline.
     if (mediaPlacements.length > 0) {
       const articleMediaRecords = mediaPlacements.map((entry, index) => ({
         revision_id: currentRevisionId,
         media_asset_id: entry.mediaAssetId,
-        role: "inline" as const,
+        role: entry.isCover ? ("hero" as const) : ("inline" as const),
         position: index,
         alt_text: entry.altText,
         caption: entry.caption,
