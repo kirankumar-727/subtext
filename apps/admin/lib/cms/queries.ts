@@ -343,6 +343,7 @@ export async function getStory(articleId: string) {
     coverMediaAssetId:
       (mediaPlacements.data ?? []).find((placement) => placement.role === "hero")?.media_asset_id ??
       null,
+    mediaAssetIds: (mediaPlacements.data ?? []).map((placement) => placement.media_asset_id),
     readiness: {
       revisionId: article.current_draft_revision_id,
       categoryPillarId: categoryResult.data?.pillar_id ?? null,
