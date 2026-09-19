@@ -153,6 +153,7 @@ export async function saveStoryDraft(input: StoryDraftInput) {
     p_tag_ids: draft.tagIds,
     p_source_ids: draft.sourceIds,
     p_cover_media_asset_id: draft.coverMediaAssetId,
+    p_media_asset_ids: draft.mediaAssetIds,
     p_seo_title: draft.seoTitle,
     p_seo_description: draft.seoDescription,
     p_word_count: metrics.wordCount,
