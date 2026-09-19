@@ -6,6 +6,7 @@
  * 2. Pending media is never assigned as hero
  * 3. Failure cleanup respects FK constraints (citation-linked sources survive)
  * 4. coverMediaAssetId is returned when frontmatter cover matches an image
+ * 5. Exact-byte retries reuse an existing media asset instead of inserting a duplicate
  */
 import { describe, expect, it, vi, beforeEach } from "vitest";
 
@@ -117,7 +118,7 @@ function makePackage(overrides: Partial<StoryPackage> = {}): StoryPackage {
 // Mock Supabase factory
 // ---------------------------------------------------------------------------
 
-function createMock() {
+function createMock(existingMediaAsset: { id: string; processing_status: "pending" | "ready" | "failed" } | null = null) {
   const rpcCalls: Array<{ fn: string; args: Record<string, unknown> }> = [];
   const inserts: Array<{ table: string; data: Record<string, unknown> }> = [];
   const storageUploads: Array<{ bucket: string; key: string }> = [];
@@ -204,7 +205,7 @@ function createMock() {
       }
       if (table === "media_assets") {
         return {
-          ...chainable(null),
+          ...chainable(existingMediaAsset),
           insert: vi.fn().mockImplementation((data: Record<string, unknown>) => {
             inserts.push({ table: "media_assets", data });
             return {
@@ -353,6 +354,29 @@ describe("import media association", () => {
     if (!result.ok) return;
 
     expect(result.coverMediaAssetId).toBeNull();
+  });
+
+  it("reuses an existing pending media asset on an exact-byte retry", async () => {
+    const mock = createMock({ id: "existing-media-001", processing_status: "pending" });
+    createSupabaseServerClientMock.mockResolvedValue(mock.supabase);
+
+    const result = await executeStoryImport(makePackage({
+      images: [makePackage().images[0]!],
+    }));
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) return;
+
+    const mediaAssetInserts = mock.inserts.filter((i) => i.table === "media_assets");
+    expect(mediaAssetInserts).toHaveLength(0);
+
+    const articleMediaInserts = mock.inserts.filter((i) => i.table === "article_media");
+    const records = articleMediaInserts.flatMap((insert) =>
+      Array.isArray(insert.data) ? insert.data : [insert.data],
+    );
+    expect(records).toHaveLength(1);
+    expect(records[0]!.media_asset_id).toBe("existing-media-001");
+    expect(records[0]!.role).toBe("hero");
   });
 
   it("returns current draft revision ID (from save_story_draft), not the initial one", async () => {
