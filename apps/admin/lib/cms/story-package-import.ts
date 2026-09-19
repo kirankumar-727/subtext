@@ -15,6 +15,7 @@ import { createSupabaseServerClient } from "@subtext/supabase/server";
 import { createHash, randomUUID } from "node:crypto";
 
 import { requireAdmin } from "@/lib/auth/authorization";
+import { processMediaAsset } from "@/lib/cms/media-processing";
 import type { SourceType } from "@/lib/cms/types";
 import type { StoryFrontmatter, StoryPackage } from "./story-package";
 import { deriveSlug } from "./story-package";
@@ -583,10 +584,13 @@ export async function executeStoryImport(
 
       createdMediaAssetIds.push(mediaAssetId);
 
+      // Process imported media immediately so the asset is usable by the
+      // editor and media library. Rights remain an editorial concern: an
+      // unresolved rights status can still block publication, but it must
+      // not leave the asset permanently pending.
+      await processMediaAsset(supabase, mediaAssetId);
+
       // Track this media for linking to the revision.
-      // We do NOT assign hero/cover here: imported media is pending, and the
-      // user must process it in the media library before assigning as cover.
-      // The intended cover reference is preserved for the editor to suggest.
       const coverRef = typeof fm.cover === "string" ? fm.cover : null;
       const isCover =
         coverRef === img.archivePath ||
