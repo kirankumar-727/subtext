@@ -978,10 +978,8 @@ describe("C1 — executeStoryImport assigns processed cover as hero", () => {
     // does not exist until the import media phase.
     expect(saveDraftCalls[0]!.args.p_cover_media_asset_id).toBeNull();
 
-    // The article_media insert should contain the imported cover as hero.
-    const articleMediaInserts = [];
-    // This mock exposes the insert through the existing Supabase mock; the
-    // import path is validated by the dedicated media-association regression test.
+    // The cover is linked after draft save; the dedicated media-association
+    // regression test verifies the hero role.
     expect(saveDraftCalls[0]!.args.p_cover_media_asset_id).toBeNull();
   });
 });
