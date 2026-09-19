@@ -54,7 +54,7 @@ async function readCurrentDraftForConflict(
       .order("ordinal"),
     supabase
       .from("article_media")
-      .select("media_asset_id,role")
+      .select("media_asset_id,role,position")
       .eq("revision_id", revisionId)
       .order("position"),
   ]);
@@ -141,7 +141,7 @@ export async function saveStoryDraft(input: StoryDraftInput) {
   const draft = storyDraftSchema.parse(input);
   const metrics = deriveContentMetrics(draft.markdown);
   const supabase = await createSupabaseServerClient();
-  const { data, error } = await supabase.rpc("save_story_draft", {
+  const { data, error } = await supabase.rpc("save_story_draft_with_media", {
     p_article_id: draft.articleId,
     p_expected_row_version: draft.rowVersion,
     p_title: draft.title,
