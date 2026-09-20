@@ -211,10 +211,12 @@ export async function requestStoryPublication(input: z.infer<typeof publicationS
   }
   revalidatePath(`/admin/stories/${request.articleId}`);
   revalidatePath("/admin/stories");
-  after(async () => {
-    await dispatchPublishingWorker();
-  });
-  return { ok: true as const, value: data[0] };
+  const dispatched = await dispatchPublishingWorker();
+  return {
+    ok: true as const,
+    value: data[0],
+    workerDispatched: dispatched.dispatched,
+  };
 }
 
 export async function createTag(input: { name: string; description?: string | undefined }) {
