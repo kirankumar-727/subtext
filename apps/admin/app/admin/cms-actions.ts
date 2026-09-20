@@ -5,7 +5,6 @@ import { createSupabaseServerClient } from "@subtext/supabase/server";
 import { createHash, randomUUID } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
-import { after } from "next/server";
 import { z } from "zod";
 
 import { requireAdmin } from "@/lib/auth/authorization";
@@ -211,10 +210,12 @@ export async function requestStoryPublication(input: z.infer<typeof publicationS
   }
   revalidatePath(`/admin/stories/${request.articleId}`);
   revalidatePath("/admin/stories");
-  after(async () => {
-    await dispatchPublishingWorker();
-  });
-  return { ok: true as const, value: data[0] };
+  const dispatched = await dispatchPublishingWorker();
+  return {
+    ok: true as const,
+    value: data[0],
+    workerDispatched: dispatched.dispatched,
+  };
 }
 
 export async function createTag(input: { name: string; description?: string | undefined }) {
