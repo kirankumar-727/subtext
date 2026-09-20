@@ -473,7 +473,6 @@ export async function executeStoryImport(
       p_tag_ids: tagIds,
       p_source_ids: sourceIds,
       p_cover_media_asset_id: null,
-      p_media_asset_ids: [],
       p_seo_title: seoTitle,
       p_seo_description: seoDescription,
       p_word_count: metrics.wordCount,
