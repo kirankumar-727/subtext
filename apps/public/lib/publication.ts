@@ -24,6 +24,7 @@ export function buildRevalidationPlan(input: RevalidationInput) {
       "search",
       `article:${input.articleId}`,
       `pillar:${input.pillarSlug}`,
+      ...(input.categorySlug ? [`category:${input.pillarSlug}:${input.categorySlug}`] : []),
     ],
   };
 }
