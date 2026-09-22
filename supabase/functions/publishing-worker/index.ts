@@ -246,36 +246,6 @@ async function processJob(job: any, workerId: string) {
       .eq("article_id", job.article_id)
       .eq("is_active", true);
     if (redirectResult.error) throw redirectResult.error;
-    const verificationSnapshot =
-      job.action === "unpublish"
-        ? { citationCount: 0, mediaCount: 0 }
-        : (() => {
-            const revisionId = commit.target_revision_id;
-            return {
-              revisionId,
-              citationCount: 0,
-              mediaCount: 0,
-            };
-          })();
-
-    if (job.action !== "unpublish") {
-      const publicRelations = await Promise.all([
-        supabase
-          .from("citations")
-          .select("id")
-          .eq("revision_id", job.target_revision_id)
-          .eq("is_public", true),
-        supabase
-          .from("article_media")
-          .select("id")
-          .eq("revision_id", job.target_revision_id),
-      ]);
-      if (publicRelations.some((result) => result.error))
-        throw new Error("Publication relation verification query failed");
-      verificationSnapshot.citationCount = publicRelations[0].data?.length ?? 0;
-      verificationSnapshot.mediaCount = publicRelations[1].data?.length ?? 0;
-    }
-
     const verification = await publicApi({
       mode: "revalidate",
       articleId: commit.article_id,
@@ -284,9 +254,6 @@ async function processJob(job: any, workerId: string) {
       pillarSlug: commit.pillar_slug,
       categorySlug: commit.category_slug,
       contentChecksum: commit.content_checksum,
-      revisionId: commit.target_revision_id,
-      expectedCitationCount: verificationSnapshot.citationCount,
-      expectedMediaCount: verificationSnapshot.mediaCount,
       redirectPaths: (redirectResult.data ?? []).map((item: any) => item.from_path),
     });
     await event(
