@@ -22,9 +22,6 @@ const revalidateSchema = z.object({
     .string()
     .regex(/^[0-9a-f]{64}$/)
     .nullable(),
-  revisionId: z.uuid().nullable(),
-  expectedCitationCount: z.number().int().nonnegative().max(1000),
-  expectedMediaCount: z.number().int().nonnegative().max(1000),
   redirectPaths: z.array(z.string().startsWith("/")).max(100),
 });
 
@@ -67,7 +64,7 @@ export async function POST(request: Request) {
     for (const tag of plan.tags) revalidateTag(tag, "max");
 
     const supabase = createSupabasePublicServerClient();
-    const [articleResult, searchResult, citationResult, mediaResult] = await Promise.all([
+    const [articleResult, searchResult] = await Promise.all([
       supabase
         .from("published_articles")
         .select("id,revision_id,canonical_path,content_checksum,body_markdown")
@@ -78,44 +75,27 @@ export async function POST(request: Request) {
         .select("article_id,revision_id,canonical_path")
         .eq("article_id", input.articleId)
         .maybeSingle(),
-      supabase
-        .from("published_citations")
-        .select("id")
-        .eq("article_id", input.articleId),
-      supabase
-        .from("published_media")
-        .select("article_media_id")
-        .eq("article_id", input.articleId),
     ]);
-    if (articleResult.error || searchResult.error || citationResult.error || mediaResult.error)
+    if (articleResult.error || searchResult.error)
       throw new Error("Public projection query failed");
 
     const projectedArticle =
-      articleResult.data?.revision_id && articleResult.data.content_checksum && articleResult.data.canonical_path
+      articleResult.data?.content_checksum && articleResult.data.canonical_path
         ? {
-            revision_id: articleResult.data.revision_id,
             content_checksum: articleResult.data.content_checksum,
             canonical_path: articleResult.data.canonical_path,
           }
         : null;
-    const projectedSearch = searchResult.data?.revision_id && searchResult.data.canonical_path
-      ? {
-          revision_id: searchResult.data.revision_id,
-          canonical_path: searchResult.data.canonical_path,
-        }
+    const projectedSearch = searchResult.data?.canonical_path
+      ? { canonical_path: searchResult.data.canonical_path }
       : null;
     if (
       !verifyProjection({
         action: input.action,
         expectedChecksum: input.contentChecksum,
         expectedPath: input.canonicalPath,
-        expectedRevisionId: input.revisionId,
-        expectedCitationCount: input.expectedCitationCount,
-        expectedMediaCount: input.expectedMediaCount,
         article: projectedArticle,
         search: projectedSearch,
-        citationCount: citationResult.data?.length ?? 0,
-        mediaCount: mediaResult.data?.length ?? 0,
       })
     ) {
       throw new Error("Public projection does not match publication intent");
