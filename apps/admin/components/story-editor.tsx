@@ -127,6 +127,7 @@ export function StoryEditor({
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inFlight = useRef(false);
+  const saveQueued = useRef(false);
   const latestDraft = useRef(draft);
   const contentSnapshot = useMemo(() => serializeDraftContent(draft), [draft]);
   const metrics = useMemo(() => deriveContentMetrics(draft.markdown), [draft.markdown]);
@@ -156,8 +157,13 @@ export function StoryEditor({
   }, [moreActionsOpen]);
 
   const persist = useCallback(async () => {
-    if (inFlight.current || conflict) return false;
+    if (conflict) return false;
+    if (inFlight.current) {
+      saveQueued.current = true;
+      return false;
+    }
     inFlight.current = true;
+    saveQueued.current = false;
     const payload = latestDraft.current;
     const payloadSnapshot = serializeDraftContent(payload);
     setStatus("saving");
@@ -176,6 +182,8 @@ export function StoryEditor({
     inFlight.current = false;
 
     if (!result.ok) {
+      const retryQueuedSave = saveQueued.current;
+      saveQueued.current = false;
       setStatus("error");
       setMessageType("error");
       if (result.code === "conflict") {
@@ -187,6 +195,9 @@ export function StoryEditor({
         );
       } else {
         setMessage(result.message);
+      }
+      if (retryQueuedSave && result.code !== "conflict") {
+        window.setTimeout(() => void persist(), AUTOSAVE_DELAY_MS);
       }
       return false;
     }
@@ -208,6 +219,12 @@ export function StoryEditor({
     } else {
       setStatus("unsaved");
     }
+
+    if (saveQueued.current && !conflict) {
+      saveQueued.current = false;
+      window.setTimeout(() => void persist(), 0);
+    }
+
     return true;
   }, [conflict, messageType, storageKey]);
 
