@@ -294,14 +294,14 @@ export function StoryEditor({
         ? current.mediaAssetIds.filter((id) => id !== mediaAssetId)
         : [...current.mediaAssetIds, mediaAssetId];
 
-      let coverMediaAssetId = current.coverMediaAssetId;
-      if (selected && coverMediaAssetId === mediaAssetId) {
-        coverMediaAssetId = mediaAssetIds[0] ?? null;
-      } else if (!selected && !coverMediaAssetId) {
-        coverMediaAssetId = mediaAssetId;
-      }
-
-      return { ...current, mediaAssetIds, coverMediaAssetId };
+      return {
+        ...current,
+        mediaAssetIds,
+        coverMediaAssetId:
+          selected && current.coverMediaAssetId === mediaAssetId
+            ? null
+            : current.coverMediaAssetId,
+      };
     });
   }
 
