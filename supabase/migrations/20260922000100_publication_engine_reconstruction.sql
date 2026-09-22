@@ -69,11 +69,6 @@ create trigger publication_jobs_validate_transition
 before update of status on public.publication_jobs
 for each row execute function private.validate_publication_job_transition();
 
-drop trigger if exists publication_jobs_audit on public.publication_jobs;
-create trigger publication_jobs_audit
-after insert or delete or update on public.publication_jobs
-for each row execute function private.audit_mutation();
-
 create or replace function public.request_story_publication(
   p_article_id uuid,
   p_action public.publication_action,
