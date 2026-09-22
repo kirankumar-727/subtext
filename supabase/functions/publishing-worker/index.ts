@@ -48,6 +48,7 @@ const publicationApi = new URL(
   required("PUBLICATION_API_URL"),
 ).toString();
 const revalidationSecret = required("REVALIDATION_SECRET");
+const WORKER_VERSION = "publication-engine-rebuild-2026-09-22";
 
 async function event(
   jobId: string,
@@ -174,6 +175,8 @@ async function processJob(job: any, workerId: string) {
     await event(job.id, "processing_started", "info", "Publication processing started.", {
       attempt: job.attempt_count,
       status: job.status,
+      worker_version: WORKER_VERSION,
+      worker_id: workerId,
     });
     let commit: any;
     if (job.status === "processing") {
@@ -270,14 +273,32 @@ async function processJob(job: any, workerId: string) {
   } catch (error) {
     const code = error instanceof WorkerError ? error.code : "worker_failure";
     const retryable = error instanceof WorkerError ? error.retryable : true;
-    await supabase.rpc("fail_publication_job", {
-      p_job_id: job.id,
-      p_worker_id: workerId,
-      p_error_code: code,
-      p_error_detail: { message: error instanceof Error ? error.message : "Unknown worker error" },
-      p_retryable: retryable,
-    });
-    return { id: job.id, status: retryable ? "retry_scheduled" : "failed" };
+    const detail = {
+      message: error instanceof Error ? error.message : "Unknown worker error",
+      worker_version: WORKER_VERSION,
+    };
+    try {
+      const failed = await supabase.rpc("fail_publication_job", {
+        p_job_id: job.id,
+        p_worker_id: workerId,
+        p_error_code: code,
+        p_error_detail: detail,
+        p_retryable: retryable,
+      });
+      if (failed.error) throw failed.error;
+      return { id: job.id, status: retryable ? "retry_scheduled" : "failed", error_code: code };
+    } catch (finalizationError) {
+      // A lost lease/worker race must not crash the whole batch. The durable
+      // lease makes the job reclaimable by the next worker invocation.
+      await event(
+        job.id,
+        "worker_finalization_failed",
+        "error",
+        "Worker could not finalize the failed job; lease recovery will retry it.",
+        { error_code: code, worker_version: WORKER_VERSION },
+      ).catch(() => undefined);
+      return { id: job.id, status: "finalization_pending", error_code: code };
+    }
   }
 }
 
