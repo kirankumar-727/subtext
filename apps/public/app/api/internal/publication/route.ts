@@ -91,14 +91,14 @@ export async function POST(request: Request) {
       throw new Error("Public projection query failed");
 
     const projectedArticle =
-      articleResult.data?.content_checksum && articleResult.data.canonical_path
+      articleResult.data?.revision_id && articleResult.data.content_checksum && articleResult.data.canonical_path
         ? {
             revision_id: articleResult.data.revision_id,
             content_checksum: articleResult.data.content_checksum,
             canonical_path: articleResult.data.canonical_path,
           }
         : null;
-    const projectedSearch = searchResult.data?.canonical_path
+    const projectedSearch = searchResult.data?.revision_id && searchResult.data.canonical_path
       ? {
           revision_id: searchResult.data.revision_id,
           canonical_path: searchResult.data.canonical_path,
