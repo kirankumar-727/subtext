@@ -294,14 +294,14 @@ export function StoryEditor({
         ? current.mediaAssetIds.filter((id) => id !== mediaAssetId)
         : [...current.mediaAssetIds, mediaAssetId];
 
-      let coverMediaAssetId = current.coverMediaAssetId;
-      if (selected && coverMediaAssetId === mediaAssetId) {
-        coverMediaAssetId = mediaAssetIds[0] ?? null;
-      } else if (!selected && !coverMediaAssetId) {
-        coverMediaAssetId = mediaAssetId;
-      }
-
-      return { ...current, mediaAssetIds, coverMediaAssetId };
+      return {
+        ...current,
+        mediaAssetIds,
+        coverMediaAssetId:
+          selected && current.coverMediaAssetId === mediaAssetId
+            ? null
+            : current.coverMediaAssetId,
+      };
     });
   }
 
@@ -1278,51 +1278,81 @@ export function StoryEditor({
 
                 <h4 className="sub-heading">Choose from Media Library</h4>
                 <p className="panel-hint">
-                  Select multiple images for this story. Selected images are saved as inline media;
-                  choose one selected image as the cover.
+                  Check every image you want attached to this story. Multiple images can be selected.
+                  The cover is chosen separately.
                 </p>
+                <div className="media-picker__actions">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      update(
+                        "mediaAssetIds",
+                        draft.mediaAssetIds.length === story.readiness.media.length
+                          ? []
+                          : story.readiness.media.map((media) => media.mediaAssetId),
+                      )
+                    }
+                  >
+                    {draft.mediaAssetIds.length === story.readiness.media.length
+                      ? "Clear selection"
+                      : "Select all story images"}
+                  </button>
+                </div>
                 <div className="media-picker">
                   {reference.media.map((asset) => {
                     const isSelectable = asset.processing_status === "ready";
                     const isSelected = draft.mediaAssetIds.includes(asset.id);
+                    const isStoryMedia = story.readiness.media.some(
+                      (media) => media.mediaAssetId === asset.id,
+                    );
                     const isCover = draft.coverMediaAssetId === asset.id;
+
                     return (
-                      <button
-                        className={`${isSelected ? "is-selected" : ""}${isCover ? " is-cover" : ""}${!isSelectable ? " is-unavailable" : ""}`}
-                        disabled={!isSelectable}
+                      <label
+                        className={`media-picker__item${isSelected ? " is-selected" : ""}${isCover ? " is-cover" : ""}${!isSelectable ? " is-unavailable" : ""}`}
                         key={asset.id}
-                        onClick={() => toggleMediaSelection(asset.id)}
-                        title={
-                          isSelectable
-                            ? `${asset.original_filename}${isSelected ? " — selected" : ""}${isCover ? " — cover" : ""}`
-                            : `${asset.original_filename} is ${asset.processing_status}; wait until it is ready`
-                        }
-                        type="button"
                       >
-                        {asset.publicUrl ? <img alt={asset.default_alt_text ?? ""} src={asset.publicUrl} /> : null}
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          disabled={!isSelectable}
+                          onChange={() => toggleMediaSelection(asset.id)}
+                        />
+                        {asset.publicUrl ? (
+                          <img alt={asset.default_alt_text ?? ""} src={asset.publicUrl} />
+                        ) : null}
                         <span>{asset.original_filename}</span>
-                        {isCover ? <small>Cover</small> : isSelected ? <small>Selected</small> : null}
+                        {isStoryMedia ? <small>In story</small> : null}
+                        {isCover ? <small>Cover</small> : null}
                         {!isSelectable ? <small>{asset.processing_status}</small> : null}
-                      </button>
+                      </label>
                     );
                   })}
                 </div>
+
                 {draft.mediaAssetIds.length > 0 ? (
                   <label className="panel-field">
                     Cover image
                     <select
                       value={draft.coverMediaAssetId ?? ""}
-                      onChange={(event) => update("coverMediaAssetId", event.target.value || null)}
+                      onChange={(event) =>
+                        update("coverMediaAssetId", event.target.value || null)
+                      }
                     >
                       <option value="">No cover</option>
                       {draft.mediaAssetIds.map((mediaAssetId) => {
                         const asset = reference.media.find((item) => item.id === mediaAssetId);
                         if (!asset) return null;
-                        return <option key={asset.id} value={asset.id}>{asset.original_filename}</option>;
+                        return (
+                          <option key={asset.id} value={asset.id}>
+                            {asset.original_filename}
+                          </option>
+                        );
                       })}
                     </select>
                   </label>
                 ) : null}
+
                 {draft.mediaAssetIds.length > 0 ? (
                   <button
                     className="insert-inline-btn"
@@ -1332,7 +1362,12 @@ export function StoryEditor({
                       );
                       if (!selected.length) return;
                       insertAtCursor(
-                        selected.map((asset) => `\n![${asset.default_alt_text ?? ""}](${asset.publicUrl} "${asset.default_caption ?? ""}")\n`).join(""),
+                        selected
+                          .map(
+                            (asset) =>
+                              `\n![${asset.default_alt_text ?? ""}](${asset.publicUrl} "${asset.default_caption ?? ""}")\n`,
+                          )
+                          .join(""),
                       );
                     }}
                     type="button"

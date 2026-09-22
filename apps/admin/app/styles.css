@@ -859,9 +859,38 @@ html {
   max-height: 18rem;
   overflow-y: auto;
 }
-.media-picker button {
+.media-picker__item {
+  position: relative;
   overflow: hidden;
   padding: 0.25rem;
+  border: 1px solid var(--st-color-rule);
+  cursor: pointer;
+}
+.media-picker__item.is-selected {
+  border-color: var(--st-color-accent);
+}
+.media-picker__item.is-cover {
+  box-shadow: inset 0 0 0 2px var(--st-color-accent);
+}
+.media-picker__item input {
+  position: absolute;
+  left: 0.4rem;
+  top: 0.4rem;
+  z-index: 2;
+  width: 1rem;
+  height: 1rem;
+}
+.media-picker__item small {
+  display: inline-block;
+  margin-right: 0.3rem;
+}
+.media-picker__actions {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.5rem;
+}
+.media-picker__actions button {
+  padding: 0.3rem 0.55rem;
 }
 .media-picker button.is-selected {
   border-color: var(--st-color-accent);
