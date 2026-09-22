@@ -48,6 +48,7 @@ const publicationApi = new URL(
   required("PUBLICATION_API_URL"),
 ).toString();
 const revalidationSecret = required("REVALIDATION_SECRET");
+const WORKER_VERSION = "publication-engine-rebuild-2026-09-22";
 
 async function event(
   jobId: string,
@@ -174,6 +175,8 @@ async function processJob(job: any, workerId: string) {
     await event(job.id, "processing_started", "info", "Publication processing started.", {
       attempt: job.attempt_count,
       status: job.status,
+      worker_version: WORKER_VERSION,
+      worker_id: workerId,
     });
     let commit: any;
     if (job.status === "processing") {
@@ -243,6 +246,36 @@ async function processJob(job: any, workerId: string) {
       .eq("article_id", job.article_id)
       .eq("is_active", true);
     if (redirectResult.error) throw redirectResult.error;
+    const verificationSnapshot =
+      job.action === "unpublish"
+        ? { citationCount: 0, mediaCount: 0 }
+        : (() => {
+            const revisionId = commit.target_revision_id;
+            return {
+              revisionId,
+              citationCount: 0,
+              mediaCount: 0,
+            };
+          })();
+
+    if (job.action !== "unpublish") {
+      const publicRelations = await Promise.all([
+        supabase
+          .from("citations")
+          .select("id")
+          .eq("revision_id", job.target_revision_id)
+          .eq("is_public", true),
+        supabase
+          .from("article_media")
+          .select("id")
+          .eq("revision_id", job.target_revision_id),
+      ]);
+      if (publicRelations.some((result) => result.error))
+        throw new Error("Publication relation verification query failed");
+      verificationSnapshot.citationCount = publicRelations[0].data?.length ?? 0;
+      verificationSnapshot.mediaCount = publicRelations[1].data?.length ?? 0;
+    }
+
     const verification = await publicApi({
       mode: "revalidate",
       articleId: commit.article_id,
@@ -251,6 +284,9 @@ async function processJob(job: any, workerId: string) {
       pillarSlug: commit.pillar_slug,
       categorySlug: commit.category_slug,
       contentChecksum: commit.content_checksum,
+      revisionId: commit.target_revision_id,
+      expectedCitationCount: verificationSnapshot.citationCount,
+      expectedMediaCount: verificationSnapshot.mediaCount,
       redirectPaths: (redirectResult.data ?? []).map((item: any) => item.from_path),
     });
     await event(
@@ -270,14 +306,32 @@ async function processJob(job: any, workerId: string) {
   } catch (error) {
     const code = error instanceof WorkerError ? error.code : "worker_failure";
     const retryable = error instanceof WorkerError ? error.retryable : true;
-    await supabase.rpc("fail_publication_job", {
-      p_job_id: job.id,
-      p_worker_id: workerId,
-      p_error_code: code,
-      p_error_detail: { message: error instanceof Error ? error.message : "Unknown worker error" },
-      p_retryable: retryable,
-    });
-    return { id: job.id, status: retryable ? "retry_scheduled" : "failed" };
+    const detail = {
+      message: error instanceof Error ? error.message : "Unknown worker error",
+      worker_version: WORKER_VERSION,
+    };
+    try {
+      const failed = await supabase.rpc("fail_publication_job", {
+        p_job_id: job.id,
+        p_worker_id: workerId,
+        p_error_code: code,
+        p_error_detail: detail,
+        p_retryable: retryable,
+      });
+      if (failed.error) throw failed.error;
+      return { id: job.id, status: retryable ? "retry_scheduled" : "failed", error_code: code };
+    } catch (finalizationError) {
+      // A lost lease/worker race must not crash the whole batch. The durable
+      // lease makes the job reclaimable by the next worker invocation.
+      await event(
+        job.id,
+        "worker_finalization_failed",
+        "error",
+        "Worker could not finalize the failed job; lease recovery will retry it.",
+        { error_code: code, worker_version: WORKER_VERSION },
+      ).catch(() => undefined);
+      return { id: job.id, status: "finalization_pending", error_code: code };
+    }
   }
 }
 
