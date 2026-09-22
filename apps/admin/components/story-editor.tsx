@@ -182,6 +182,8 @@ export function StoryEditor({
     inFlight.current = false;
 
     if (!result.ok) {
+      const retryQueuedSave = saveQueued.current;
+      saveQueued.current = false;
       setStatus("error");
       setMessageType("error");
       if (result.code === "conflict") {
@@ -193,6 +195,9 @@ export function StoryEditor({
         );
       } else {
         setMessage(result.message);
+      }
+      if (retryQueuedSave && result.code !== "conflict") {
+        window.setTimeout(() => void persist(), AUTOSAVE_DELAY_MS);
       }
       return false;
     }
