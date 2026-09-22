@@ -32,7 +32,7 @@ async function createValidStory() {
   ).rows[0];
   const saved = (
     await db.query(
-      `select * from public.save_story_draft($1,$2,'Engine Story','engine-story-live','A documented story.','# Engine Story\n\nDocumented.[^src-1]','Engine Story Documented.','10000000-0000-4000-8000-000000000001',null,'{}'::uuid[],array[$3]::uuid[],null,'Engine Story','A documented story for publication.',4,1)`,
+      `select * from public.save_story_draft($1,$2,'Engine Story','engine-story-live','A documented story.','# Engine Story\n\nDocumented.[^src-1]','Engine Story Documented.','10000000-0000-4000-8000-000000000001',null,'{}'::uuid[],array[$3]::uuid[],null,'{}'::uuid[],'Engine Story','A documented story for publication.',4,1)`,
       [created.article_id, created.row_version, source.id],
     )
   ).rows[0];
@@ -90,7 +90,17 @@ try {
     "91000000-0000-4000-8000-000000000002",
   );
   assert.equal(requested.job_status, "queued");
+  const pinnedJob = (await db.query(`select expected_content_checksum from public.publication_jobs where id=$1`, [requested.publication_job_id])).rows[0];
+  assert.ok(pinnedJob.expected_content_checksum, "Publication job must pin the immutable revision checksum");
   await role("service_role", serviceClaims);
+  const triggerNames = (
+    await db.query(
+      `select tgname from pg_trigger where tgrelid='public.publication_jobs'::regclass and not tgisinternal`,
+    )
+  ).rows.map((row) => row.tgname);
+  assert.ok(triggerNames.includes("publication_jobs_validate_target"), "Publication target trigger missing");
+  assert.ok(triggerNames.includes("publication_jobs_validate_transition"), "Publication transition trigger missing");
+
   const claimDefinition = await db.query(
     `select pg_get_functiondef('public.claim_publication_jobs(text,integer,integer)'::regprocedure) as definition`,
   );
@@ -251,7 +261,7 @@ try {
   ).rows[0];
   const restartRevision = (
     await db.query(
-      `select * from public.save_story_draft($1,$2,'Restart Safe','restart-safe','Restart.','# Restart\n\nSafe.[^src-1]','Restart Safe.','10000000-0000-4000-8000-000000000001',null,'{}'::uuid[],array[$3]::uuid[],null,'Restart Safe','Restart-safe publication.',3,1)`,
+      `select * from public.save_story_draft($1,$2,'Restart Safe','restart-safe','Restart.','# Restart\n\nSafe.[^src-1]','Restart Safe.','10000000-0000-4000-8000-000000000001',null,'{}'::uuid[],array[$3]::uuid[],null,'{}'::uuid[],'Restart Safe','Restart-safe publication.',3,1)`,
       [created.article_id, latestArticle.row_version, source.id],
     )
   ).rows[0];
