@@ -202,7 +202,10 @@ export function StoryEditor({
       return false;
     }
 
-    setDraft((current) => ({ ...current, rowVersion: Number(result.value.row_version) }));
+    const savedRowVersion = Number(result.value.row_version);
+    const latestAfterSave = { ...latestDraft.current, rowVersion: savedRowVersion };
+    latestDraft.current = latestAfterSave;
+    setDraft((current) => ({ ...current, rowVersion: savedRowVersion }));
     setLastSavedAt(new Date());
 
     if (serializeDraftContent(latestDraft.current) === payloadSnapshot) {
