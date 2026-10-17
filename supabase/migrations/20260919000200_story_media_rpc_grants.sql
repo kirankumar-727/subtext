@@ -1,0 +1,2 @@
+revoke execute on function public.save_story_draft(uuid,bigint,text,text,text,text,text,uuid,uuid,uuid[],uuid[],uuid,uuid[],text,text,integer,integer) from public, anon;
+grant execute on function public.save_story_draft(uuid,bigint,text,text,text,text,text,uuid,uuid,uuid[],uuid[],uuid,uuid[],text,text,integer,integer) to authenticated;
