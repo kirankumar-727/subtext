@@ -94,6 +94,7 @@ export function StoryEditor({
   const [isDeleting, setIsDeleting] = useState(false);
   const [conflict, setConflict] = useState<DraftConflict | null>(null);
   const saveAfterConflict = useRef(false);
+  const persistRef = useRef<() => Promise<boolean>>(async () => false);
 
   // Panel state for Tags, Cover, Sources
   const [tagQuery, setTagQuery] = useState("");
@@ -197,7 +198,7 @@ export function StoryEditor({
         setMessage(result.message);
       }
       if (retryQueuedSave && result.code !== "conflict") {
-        window.setTimeout(() => void persist(), AUTOSAVE_DELAY_MS);
+        window.setTimeout(() => void persistRef.current(), AUTOSAVE_DELAY_MS);
       }
       return false;
     }
@@ -225,11 +226,15 @@ export function StoryEditor({
 
     if (saveQueued.current && !conflict) {
       saveQueued.current = false;
-      window.setTimeout(() => void persist(), 0);
+      window.setTimeout(() => void persistRef.current(), 0);
     }
 
     return true;
   }, [conflict, messageType, storageKey]);
+
+  useEffect(() => {
+    persistRef.current = persist;
+  }, [persist]);
 
   // Local recovery on initial load
   useEffect(() => {
@@ -264,7 +269,7 @@ export function StoryEditor({
     } catch {
       // Ignore
     }
-    const timer = window.setTimeout(() => void persist(), AUTOSAVE_DELAY_MS);
+    const timer = window.setTimeout(() => void persistRef.current(), AUTOSAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [conflict, contentSnapshot, draft, persist, storageKey]);
 
