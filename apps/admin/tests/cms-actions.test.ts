@@ -50,12 +50,12 @@ import {
   createSourceInline,
   createStory,
   createTag,
-  finalizeMediaUpload,
   requestStoryPublication,
   saveStoryDraft,
   updateSiteSettings,
 } from "@/app/admin/cms-actions";
 import { rebaseDraftOntoServer } from "@/lib/cms/autosave";
+import type { processMediaAsset } from "@/lib/cms/media-processing";
 
 const articleId = "90000000-0000-4000-8000-000000000001";
 const revisionId = "90000000-0000-4000-8000-000000000002";
@@ -127,7 +127,7 @@ describe("saveStoryDraft conflict handling", () => {
             error: null,
           },
           article_media: {
-            data: { media_asset_id: "90000000-0000-4000-8000-000000000006" },
+            data: [{ role: "hero", media_asset_id: "90000000-0000-4000-8000-000000000006" }],
             error: null,
           },
         };
@@ -155,7 +155,7 @@ describe("saveStoryDraft conflict handling", () => {
     const result = await saveStoryDraft(localDraft);
 
     expect(rpc).toHaveBeenCalledWith(
-      "save_story_draft",
+      "save_story_draft_with_media",
       expect.objectContaining({ p_expected_row_version: 4 }),
     );
     expect(result).toEqual({
@@ -180,7 +180,7 @@ describe("saveStoryDraft conflict handling", () => {
     expect(staleRetry).toEqual(expect.objectContaining({ ok: false, code: "conflict" }));
     expect(rpc).toHaveBeenNthCalledWith(
       2,
-      "save_story_draft",
+      "save_story_draft_with_media",
       expect.objectContaining({ p_expected_row_version: 4 }),
     );
     expect(revalidatePathMock).not.toHaveBeenCalled();
@@ -196,7 +196,7 @@ describe("saveStoryDraft conflict handling", () => {
     });
     expect(rpc).toHaveBeenNthCalledWith(
       3,
-      "save_story_draft",
+      "save_story_draft_with_media",
       expect.objectContaining({
         p_expected_row_version: 9,
         p_title: "Local title",
@@ -475,9 +475,12 @@ describe("media integrity and cleanup", () => {
       },
     });
 
-    await expect(finalizeMediaUpload(mediaAssetId)).rejects.toThrow(
-      "Upload integrity check failed",
-    );
+    const { processMediaAsset: processMediaAssetActual } = await vi.importActual<{
+      processMediaAsset: typeof processMediaAsset;
+    }>("@/lib/cms/media-processing");
+    await expect(
+      processMediaAssetActual(await createSupabaseServerClientMock(), mediaAssetId),
+    ).rejects.toThrow("Upload integrity check failed");
     expect(sharpMock).not.toHaveBeenCalled();
     expect(update).toHaveBeenCalledWith({
       processing_status: "failed",
@@ -559,7 +562,12 @@ describe("media integrity and cleanup", () => {
       },
     });
 
-    await expect(finalizeMediaUpload(mediaAssetId)).rejects.toThrow("Image processing failed");
+    const { processMediaAsset: processMediaAssetActual } = await vi.importActual<{
+      processMediaAsset: typeof processMediaAsset;
+    }>("@/lib/cms/media-processing");
+    await expect(
+      processMediaAssetActual(await createSupabaseServerClientMock(), mediaAssetId),
+    ).rejects.toThrow("Image processing failed");
     expect(upload).toHaveBeenCalledTimes(2);
     expect(remove).toHaveBeenCalledWith([`${mediaAssetId}/w640.webp`]);
     expect(variantsDelete).not.toHaveBeenCalled();
@@ -808,8 +816,7 @@ describe("C1 — executeStoryImport assigns processed cover as hero", () => {
             select: () => ({
               eq: () => ({
                 or: () => ({
-                  maybeSingle: () =>
-                    Promise.resolve({ data: { id: pillarId }, error: null }),
+                  maybeSingle: () => Promise.resolve({ data: { id: pillarId }, error: null }),
                 }),
               }),
             }),
@@ -867,11 +874,15 @@ describe("C1 — executeStoryImport assigns processed cover as hero", () => {
           };
         }
         if (table === "media_assets") {
+          const mediaLookup = {
+            eq: () => mediaLookup,
+            maybeSingle: () => Promise.resolve({ data: null, error: null }),
+          };
           return {
+            select: () => mediaLookup,
             insert: () => ({
               // No chaining — insert returns void-like for media_assets
-              then: (resolve: (v: { error: null }) => void) =>
-                resolve({ error: null }),
+              then: (resolve: (v: { error: null }) => void) => resolve({ error: null }),
             }),
           };
         }
@@ -914,12 +925,14 @@ describe("C1 — executeStoryImport assigns processed cover as hero", () => {
         }
         if (name === "save_story_draft") {
           return Promise.resolve({
-            data: [{
-              article_id: args.p_article_id,
-              revision_id: "rev-saved-001",
-              row_version: 2,
-              saved_at: new Date().toISOString(),
-            }],
+            data: [
+              {
+                article_id: args.p_article_id,
+                revision_id: "rev-saved-001",
+                row_version: 2,
+                saved_at: new Date().toISOString(),
+              },
+            ],
             error: null,
           });
         }
@@ -942,15 +955,13 @@ describe("C1 — executeStoryImport assigns processed cover as hero", () => {
 
     const pkg = {
       storyMarkdown:
-        "---\ntitle: \"Test Story\"\ntest-slug: test-story\npillar: Psychology\nauthor: Author\nimages:\n  - file: cover.jpg\n    alt: A cover\n    rights: owned\n    role: hero\n---\n\n## Body\n\nContent.",
+        '---\ntitle: "Test Story"\ntest-slug: test-story\npillar: Psychology\nauthor: Author\nimages:\n  - file: cover.jpg\n    alt: A cover\n    rights: owned\n    role: hero\n---\n\n## Body\n\nContent.',
       frontmatter: {
         title: "Test Story",
         slug: "test-story",
         pillar: "Psychology",
         author: "Author",
-        images: [
-          { file: "cover.jpg", alt: "A cover", rights: "owned", role: "hero" },
-        ],
+        images: [{ file: "cover.jpg", alt: "A cover", rights: "owned", role: "hero" }],
       },
       images: [
         {
@@ -1006,7 +1017,8 @@ describe("C3 — validateStoryPackage does not include image bytes in response",
       parseStoryPackage: vi.fn().mockResolvedValue({
         ok: true,
         pkg: {
-          storyMarkdown: "---\ntitle: Test\nslug: test\npillar: Psychology\nauthor: Author\n---\n\nBody.",
+          storyMarkdown:
+            "---\ntitle: Test\nslug: test\npillar: Psychology\nauthor: Author\n---\n\nBody.",
           frontmatter: { title: "Test", slug: "test", pillar: "Psychology", author: "Author" },
           images: [{ archivePath: "images/cover.jpg", data: imageBytes, extension: ".jpg" }],
           sources: [],
