@@ -85,8 +85,20 @@ security definer
 set search_path = pg_catalog, public, private
 as $$
 begin
-  perform private.refresh_search_projection(coalesce(new.article_id, old.article_id));
-  return coalesce(new, old);
+  if tg_op = 'INSERT' then
+    perform private.refresh_search_projection(new.article_id);
+    return new;
+  elsif tg_op = 'DELETE' then
+    perform private.refresh_search_projection(old.article_id);
+    return old;
+  end if;
+
+  -- UPDATE may move a tag association between articles; refresh both sides.
+  if old.article_id is distinct from new.article_id then
+    perform private.refresh_search_projection(old.article_id);
+  end if;
+  perform private.refresh_search_projection(new.article_id);
+  return new;
 end;
 $$;
 
