@@ -803,7 +803,8 @@ function AuthorCard({ author, index }: { author: EditorialAuthor; index: number 
       </div>
       <div className="editorial-author-heading">
         <span aria-hidden="true" className="editorial-author-avatar editorial-author-avatar--owner">
-          <img alt="" src="/images/subtext-owner-avatar.jpg" />
+          <span className="editorial-author-avatar__fallback">{author.name.slice(0, 1).toUpperCase()}</span>
+          <img alt="" onError={(event) => { event.currentTarget.hidden = true; }} src="/images/subtext-owner-avatar.jpg" />
         </span>
         <div className="editorial-author-identity">
           <h3>{author.name}</h3>
