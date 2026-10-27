@@ -6054,3 +6054,37 @@ summary:focus-visible {
   background: transparent;
   color: var(--workspace-sidebar-text);
 }
+
+
+/* Founder identity on the read-only authors library. */
+.editorial-author-avatar--owner {
+  overflow: hidden;
+  padding: 0;
+}
+
+.editorial-author-avatar--owner img {
+  display: block;
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.editorial-author-identity {
+  align-items: flex-start;
+  display: flex;
+  flex-direction: column;
+  gap: 0.22rem;
+  min-width: 0;
+}
+
+.editorial-owner-label {
+  border: 1px solid var(--workspace-border, #d8d2c5);
+  color: var(--workspace-muted, #796f61);
+  display: inline-block;
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  line-height: 1.5;
+  padding: 0.12rem 0.38rem;
+  text-transform: uppercase;
+}
