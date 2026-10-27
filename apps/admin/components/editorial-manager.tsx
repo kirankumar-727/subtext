@@ -802,11 +802,18 @@ function AuthorCard({ author, index }: { author: EditorialAuthor; index: number 
         <RecordStatus isActive={author.is_active} />
       </div>
       <div className="editorial-author-heading">
-        <span aria-hidden="true" className="editorial-author-avatar">
-          {author.name.slice(0, 1).toUpperCase()}
+        <span aria-hidden="true" className="editorial-author-avatar editorial-author-avatar--owner">
+          <span className="editorial-author-avatar__fallback">{author.name.slice(0, 1).toUpperCase()}</span>
+          <img
+            alt=""
+            className="editorial-author-avatar__image"
+            onError={(event) => { event.currentTarget.hidden = true; }}
+            src="/images/subtext-owner-avatar.jpg"
+          />
         </span>
-        <div>
+        <div className="editorial-author-identity">
           <h3>{author.name}</h3>
+          <span className="editorial-owner-label">SubText Owner</span>
           <code>{author.slug}</code>
         </div>
       </div>
