@@ -1,7 +1,7 @@
 # Subtext Media Database Dependency Graph
 
 **Generated artifact — do not edit by hand.**  
-Schema fingerprint: `a1eca762e203e58c690a04435b951837ca2b4b87fc4e41ca9cbdcee4f31ebc31`
+Schema fingerprint: `4a4b9589208039f66fe20e8f9206b3f997cc02f64ff3ae05cae95aa24a3a37de`
 
 ![Generated Subtext Media database dependency graph](./dependency-graph.svg)
 
@@ -74,6 +74,7 @@ flowchart LR
 19. `20260922000200_fix_publication_draft_save.sql`
 20. `20260927000100_fix_story_media_save_rpc.sql`
 21. `20261019000100_fix_ambiguous_story_save_column.sql`
+22. `20261029000100_search_projection_public_read.sql`
 
 ## Table creation order
 
