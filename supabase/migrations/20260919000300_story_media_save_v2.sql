@@ -38,5 +38,10 @@ end;
 $$;
 revoke execute on function public.save_story_draft_with_media(uuid,bigint,text,text,text,text,text,uuid,uuid,uuid[],uuid[],uuid,uuid[],text,text,integer,integer) from public,anon;
 grant execute on function public.save_story_draft_with_media(uuid,bigint,text,text,text,text,text,uuid,uuid,uuid[],uuid[],uuid,uuid[],text,text,integer,integer) to authenticated;
-revoke execute on function public.save_story_draft(uuid,bigint,text,text,text,text,text,uuid,uuid,uuid[],uuid[],uuid,uuid[],text,text,integer,integer) from public,anon;
-grant execute on function public.save_story_draft(uuid,bigint,text,text,text,text,text,uuid,uuid,uuid[],uuid[],uuid,uuid[],text,text,integer,integer) to authenticated;
+-- save_story_draft is the 16-argument legacy signature restored by
+-- 20260919000200; the 17-argument media overload is only introduced later by
+-- 20260922000200 and is granted there. Referencing that overload here aborts
+-- the migration chain with SQLSTATE 42883 before the publication engine
+-- migrations can ever apply.
+revoke execute on function public.save_story_draft(uuid,bigint,text,text,text,text,text,uuid,uuid,uuid[],uuid[],uuid,text,text,integer,integer) from public,anon;
+grant execute on function public.save_story_draft(uuid,bigint,text,text,text,text,text,uuid,uuid,uuid[],uuid[],uuid,text,text,integer,integer) to authenticated;

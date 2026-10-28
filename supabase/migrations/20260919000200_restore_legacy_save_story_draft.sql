@@ -69,7 +69,8 @@ begin
   where article.id = p_article_id
   returning article.row_version, article.updated_at into saved_row_version, saved_at;
 
-  delete from public.article_tags where article_id = p_article_id;
+  delete from public.article_tags as article_tag
+  where article_tag.article_id = p_article_id;
 
   insert into public.article_tags (article_id, tag_id)
   select p_article_id, selected_tag.tag_id
