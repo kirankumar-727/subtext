@@ -589,6 +589,11 @@ export function StoryEditor({
       if (!result.ok) {
         setMessageType("error");
         setMessage(result.message);
+      } else if (!result.workerDispatched) {
+        setMessageType("info");
+        setMessage(
+          "Publication job queued. Immediate worker dispatch did not succeed, so the next scheduled run (daily 03:00 UTC) will process it. Check the server's publishing-dispatch logs if this repeats.",
+        );
       } else {
         setMessageType("success");
         setMessage(
