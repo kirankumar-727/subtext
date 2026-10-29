@@ -1,5 +1,5 @@
 {
-  "fingerprint": "c80dde0a163d14942e3692475d71f48a5a4ee63c81f1d6a069cb06c357d643cc",
+  "fingerprint": "4a4b9589208039f66fe20e8f9206b3f997cc02f64ff3ae05cae95aa24a3a37de",
   "migrations": [
     "20260808000100_extensions_and_enums.sql",
     "20260808000200_taxonomy_and_authors.sql",
@@ -13,7 +13,16 @@
     "20260808001100_publishing_worker_commands.sql",
     "20260824000100_step2b_live_schema_reconciliation.sql",
     "20260828000700_private_media_delivery.sql",
-    "20260828000800_hide_public_storage_keys.sql"
+    "20260828000800_hide_public_storage_keys.sql",
+    "20260919000100_story_multi_media_selection.sql",
+    "20260919000200_restore_legacy_save_story_draft.sql",
+    "20260919000300_story_media_multiselect.sql",
+    "20260919000300_story_media_save_v2.sql",
+    "20260922000100_publication_engine_reconstruction.sql",
+    "20260922000200_fix_publication_draft_save.sql",
+    "20260927000100_fix_story_media_save_rpc.sql",
+    "20261019000100_fix_ambiguous_story_save_column.sql",
+    "20261029000100_search_projection_public_read.sql"
   ],
   "schema": {
     "tables": [
@@ -11214,7 +11223,21 @@
       {
         "schema_name": "public",
         "name": "save_story_draft",
+        "arguments": "p_article_id uuid, p_expected_row_version bigint, p_title text, p_slug text, p_excerpt text, p_body_markdown text, p_body_plain_text text, p_pillar_id uuid, p_category_id uuid, p_tag_ids uuid[], p_source_ids uuid[], p_cover_media_asset_id uuid, p_media_asset_ids uuid[], p_seo_title text, p_seo_description text, p_word_count integer, p_reading_time_minutes integer",
+        "result": "TABLE(article_id uuid, revision_id uuid, row_version bigint, saved_at timestamp with time zone)",
+        "description": null
+      },
+      {
+        "schema_name": "public",
+        "name": "save_story_draft",
         "arguments": "p_article_id uuid, p_expected_row_version bigint, p_title text, p_slug text, p_excerpt text, p_body_markdown text, p_body_plain_text text, p_pillar_id uuid, p_category_id uuid, p_tag_ids uuid[], p_source_ids uuid[], p_cover_media_asset_id uuid, p_seo_title text, p_seo_description text, p_word_count integer, p_reading_time_minutes integer",
+        "result": "TABLE(article_id uuid, revision_id uuid, row_version bigint, saved_at timestamp with time zone)",
+        "description": null
+      },
+      {
+        "schema_name": "public",
+        "name": "save_story_draft_with_media",
+        "arguments": "p_article_id uuid, p_expected_row_version bigint, p_title text, p_slug text, p_excerpt text, p_body_markdown text, p_body_plain_text text, p_pillar_id uuid, p_category_id uuid, p_tag_ids uuid[], p_source_ids uuid[], p_cover_media_asset_id uuid, p_media_asset_ids uuid[], p_seo_title text, p_seo_description text, p_word_count integer, p_reading_time_minutes integer",
         "result": "TABLE(article_id uuid, revision_id uuid, row_version bigint, saved_at timestamp with time zone)",
         "description": null
       },

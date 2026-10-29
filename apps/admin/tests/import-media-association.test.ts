@@ -55,22 +55,16 @@ function chainable(data: unknown) {
   builder.or = () => ({
     maybeSingle: () =>
       Promise.resolve(
-        data instanceof Array
-          ? { data: data[0] ?? null, error: null }
-          : { data, error: null },
+        data instanceof Array ? { data: data[0] ?? null, error: null } : { data, error: null },
       ),
   });
   builder.maybeSingle = () =>
     Promise.resolve(
-      data instanceof Array
-        ? { data: data[0] ?? null, error: null }
-        : { data, error: null },
+      data instanceof Array ? { data: data[0] ?? null, error: null } : { data, error: null },
     );
   builder.single = () =>
     Promise.resolve(
-      data instanceof Array
-        ? { data: data[0] ?? null, error: null }
-        : { data, error: null },
+      data instanceof Array ? { data: data[0] ?? null, error: null } : { data, error: null },
     );
   builder.then = (resolve: (v: unknown) => unknown) =>
     resolve({ data: data instanceof Array ? data : [data], error: null });
@@ -118,7 +112,12 @@ function makePackage(overrides: Partial<StoryPackage> = {}): StoryPackage {
 // Mock Supabase factory
 // ---------------------------------------------------------------------------
 
-function createMock(existingMediaAsset: { id: string; processing_status: "pending" | "ready" | "failed" } | null = null) {
+function createMock(
+  existingMediaAsset: {
+    id: string;
+    processing_status: "pending" | "ready" | "failed";
+  } | null = null,
+) {
   const rpcCalls: Array<{ fn: string; args: Record<string, unknown> }> = [];
   const inserts: Array<{ table: string; data: Record<string, unknown> }> = [];
   const storageUploads: Array<{ bucket: string; key: string }> = [];
@@ -139,12 +138,14 @@ function createMock(existingMediaAsset: { id: string; processing_status: "pendin
       }
       if (name === "save_story_draft") {
         return Promise.resolve({
-          data: [{
-            article_id: args.p_article_id,
-            revision_id: "rev-002",
-            row_version: 2,
-            saved_at: new Date().toISOString(),
-          }],
+          data: [
+            {
+              article_id: args.p_article_id,
+              revision_id: "rev-002",
+              row_version: 2,
+              saved_at: new Date().toISOString(),
+            },
+          ],
           error: null,
         });
       }
@@ -156,10 +157,14 @@ function createMock(existingMediaAsset: { id: string; processing_status: "pendin
         return chainable([{ id: "pillar-001", name: "History", slug: "history" }]);
       }
       if (table === "categories") {
-        return chainable([{
-          id: "cat-001", name: "Ancient Cities",
-          slug: "ancient-cities", pillar_id: "pillar-001",
-        }]);
+        return chainable([
+          {
+            id: "cat-001",
+            name: "Ancient Cities",
+            slug: "ancient-cities",
+            pillar_id: "pillar-001",
+          },
+        ]);
       }
       if (table === "articles") {
         return chainable(null);
@@ -171,10 +176,11 @@ function createMock(existingMediaAsset: { id: string; processing_status: "pendin
             inserts.push({ table: "tags", data });
             return {
               select: () => ({
-                single: () => Promise.resolve({
-                  data: { id: `tag-new-${inserts.length}` },
-                  error: null,
-                }),
+                single: () =>
+                  Promise.resolve({
+                    data: { id: `tag-new-${inserts.length}` },
+                    error: null,
+                  }),
               }),
             };
           }),
@@ -188,10 +194,11 @@ function createMock(existingMediaAsset: { id: string; processing_status: "pendin
             inserts.push({ table: "sources", data });
             return {
               select: () => ({
-                single: () => Promise.resolve({
-                  data: { id: `src-${String(sourceCounter).padStart(3, "0")}` },
-                  error: null,
-                }),
+                single: () =>
+                  Promise.resolve({
+                    data: { id: `src-${String(sourceCounter).padStart(3, "0")}` },
+                    error: null,
+                  }),
               }),
             };
           }),
@@ -255,7 +262,7 @@ describe("import media association", () => {
     createSupabaseServerClientMock.mockReset();
   });
 
-  it("links imported media to the revision as 'inline' via article_media", async () => {
+  it("links the selected cover as hero and other imported media inline via article_media", async () => {
     const mock = createMock();
     createSupabaseServerClientMock.mockResolvedValue(mock.supabase);
 
@@ -265,18 +272,16 @@ describe("import media association", () => {
     if (!result.ok) return;
 
     // Two images → one batch article_media insert with array of 2 records
-    const articleMediaInserts = mock.inserts.filter(
-      (i) => i.table === "article_media",
-    );
+    const articleMediaInserts = mock.inserts.filter((i) => i.table === "article_media");
     expect(articleMediaInserts.length).toBeGreaterThanOrEqual(1);
     // The batch insert passes an array
     const batchData = articleMediaInserts[0]!.data as unknown as Array<Record<string, unknown>>;
     expect(Array.isArray(batchData)).toBe(true);
     expect(batchData).toHaveLength(2);
 
-    // All linked as 'inline' to the revision from save_story_draft
+    // The cover is linked as the hero; the remaining image stays inline.
+    expect(batchData.map((media) => media.role)).toEqual(["hero", "inline"]);
     for (const am of batchData) {
-      expect(am.role).toBe("inline");
       expect(am.revision_id).toBe("rev-002");
       expect(am.alt_text).toBeTruthy();
     }
@@ -295,9 +300,7 @@ describe("import media association", () => {
     expect(result.ok).toBe(true);
     if (!result.ok) return;
 
-    const articleMediaInserts = mock.inserts.filter(
-      (i) => i.table === "article_media",
-    );
+    const articleMediaInserts = mock.inserts.filter((i) => i.table === "article_media");
     const records = articleMediaInserts.flatMap((insert) =>
       Array.isArray(insert.data) ? insert.data : [insert.data],
     );
@@ -323,13 +326,9 @@ describe("import media association", () => {
     expect(result.coverMediaAssetId).toBeTruthy();
 
     // Verify the cover asset is in the article_media batch
-    const articleMediaInserts = mock.inserts.filter(
-      (i) => i.table === "article_media",
-    );
+    const articleMediaInserts = mock.inserts.filter((i) => i.table === "article_media");
     const batchData = articleMediaInserts[0]!.data as unknown as Array<Record<string, unknown>>;
-    const coverRecord = batchData.find(
-      (r) => r.media_asset_id === result.coverMediaAssetId,
-    );
+    const coverRecord = batchData.find((r) => r.media_asset_id === result.coverMediaAssetId);
     expect(coverRecord).toBeTruthy();
     expect(coverRecord!.role).toBe("hero");
   });
@@ -360,9 +359,11 @@ describe("import media association", () => {
     const mock = createMock({ id: "existing-media-001", processing_status: "pending" });
     createSupabaseServerClientMock.mockResolvedValue(mock.supabase);
 
-    const result = await executeStoryImport(makePackage({
-      images: [makePackage().images[0]!],
-    }));
+    const result = await executeStoryImport(
+      makePackage({
+        images: [makePackage().images[0]!],
+      }),
+    );
 
     expect(result.ok).toBe(true);
     if (!result.ok) return;

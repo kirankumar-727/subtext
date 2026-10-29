@@ -94,6 +94,7 @@ export function StoryEditor({
   const [isDeleting, setIsDeleting] = useState(false);
   const [conflict, setConflict] = useState<DraftConflict | null>(null);
   const saveAfterConflict = useRef(false);
+  const persistRef = useRef<() => Promise<boolean>>(async () => false);
 
   // Panel state for Tags, Cover, Sources
   const [tagQuery, setTagQuery] = useState("");
@@ -197,7 +198,7 @@ export function StoryEditor({
         setMessage(result.message);
       }
       if (retryQueuedSave && result.code !== "conflict") {
-        window.setTimeout(() => void persist(), AUTOSAVE_DELAY_MS);
+        window.setTimeout(() => void persistRef.current(), AUTOSAVE_DELAY_MS);
       }
       return false;
     }
@@ -225,11 +226,15 @@ export function StoryEditor({
 
     if (saveQueued.current && !conflict) {
       saveQueued.current = false;
-      window.setTimeout(() => void persist(), 0);
+      window.setTimeout(() => void persistRef.current(), 0);
     }
 
     return true;
   }, [conflict, messageType, storageKey]);
+
+  useEffect(() => {
+    persistRef.current = persist;
+  }, [persist]);
 
   // Local recovery on initial load
   useEffect(() => {
@@ -264,7 +269,7 @@ export function StoryEditor({
     } catch {
       // Ignore
     }
-    const timer = window.setTimeout(() => void persist(), AUTOSAVE_DELAY_MS);
+    const timer = window.setTimeout(() => void persistRef.current(), AUTOSAVE_DELAY_MS);
     return () => window.clearTimeout(timer);
   }, [conflict, contentSnapshot, draft, persist, storageKey]);
 
@@ -301,9 +306,7 @@ export function StoryEditor({
         ...current,
         mediaAssetIds,
         coverMediaAssetId:
-          selected && current.coverMediaAssetId === mediaAssetId
-            ? null
-            : current.coverMediaAssetId,
+          selected && current.coverMediaAssetId === mediaAssetId ? null : current.coverMediaAssetId,
       };
     });
   }
@@ -586,6 +589,11 @@ export function StoryEditor({
       if (!result.ok) {
         setMessageType("error");
         setMessage(result.message);
+      } else if (!result.workerDispatched) {
+        setMessageType("info");
+        setMessage(
+          "Publication job queued. Immediate worker dispatch did not succeed, so the next scheduled run (daily 03:00 UTC) will process it. Check the server's publishing-dispatch logs if this repeats.",
+        );
       } else {
         setMessageType("success");
         setMessage(
@@ -703,11 +711,7 @@ export function StoryEditor({
     <main className={`editor-page${focusMode ? " editor-page--focus" : ""}`}>
       <header className="editor-topbar">
         <div className="editor-context">
-          <button
-            className="editor-back"
-            onClick={handleCancel}
-            type="button"
-          >
+          <button className="editor-back" onClick={handleCancel} type="button">
             <span aria-hidden="true">←</span> Stories
           </button>
           <span aria-hidden="true" className="editor-breadcrumb-divider">
@@ -1281,8 +1285,8 @@ export function StoryEditor({
 
                 <h4 className="sub-heading">Choose from Media Library</h4>
                 <p className="panel-hint">
-                  Check every image you want attached to this story. Multiple images can be selected.
-                  The cover is chosen separately.
+                  Check every image you want attached to this story. Multiple images can be
+                  selected. The cover is chosen separately.
                 </p>
                 <div className="media-picker__actions">
                   <button
@@ -1338,9 +1342,7 @@ export function StoryEditor({
                     Cover image
                     <select
                       value={draft.coverMediaAssetId ?? ""}
-                      onChange={(event) =>
-                        update("coverMediaAssetId", event.target.value || null)
-                      }
+                      onChange={(event) => update("coverMediaAssetId", event.target.value || null)}
                     >
                       <option value="">No cover</option>
                       {draft.mediaAssetIds.map((mediaAssetId) => {
