@@ -72,7 +72,7 @@
     "prettier": "3.9.6",
     "supabase": "2.112.0",
     "turbo": "2.10.8",
-    "typescript": "5.9.3",
+    "typescript": "7.0.2",
     "vitest": "4.1.10"
   }
 }
